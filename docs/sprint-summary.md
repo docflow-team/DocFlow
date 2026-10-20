@@ -2,7 +2,7 @@
 
 **Course:** SWEN3 / BIF5
 
-**Updated:** 16 October 2026
+**Updated:** 20 October 2026
 
 **Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature.
 
@@ -119,6 +119,11 @@ The controllers implement this contract directly:
 
 These endpoints extend the required core contract without changing its routes or status codes.
 
+All response bodies, including centralized problem-detail errors, use `application/json`.
+Health returns a JSON status/message object; assignment returns the document/type IDs.
+Assigning a missing document or type returns **404 Not Found**. Successful deletion
+returns **204 No Content** with no body or content type.
+
 ## Persistence and configuration
 
 The application uses PostgreSQL by default. The main variables are documented in **.env.example**:
@@ -142,7 +147,9 @@ Run the complete backend verification from the backend directory:
 ./mvnw -B -ntp clean verify
 ~~~
 
-Verified result on 16 October 2026: **27 tests, 0 failures, 0 errors, 0 skipped**.
+Verified result on 20 October 2026: **31 tests, 0 failures, 0 errors, 0 skipped** (`mvnw.cmd -B -ntp verify`). Controller tests check JSON response media types and bodies, including validation, missing resources, malformed JSON, unsupported request media types and unexpected errors.
+
+Docker Compose verification on 20 October 2026: rebuilt the backend and checked all nine endpoint operations. Every response body used `application/json`; successful deletion returned an empty **204**. Validation/malformed JSON (**400**), missing resources (**404**), unacceptable response media type (**406**) and unsupported request media type (**415**) also returned JSON. The demo document was deleted; one uniquely named verification type remains because type deletion is not implemented.
 
 The test suite covers:
 
@@ -163,10 +170,8 @@ GitHub Actions runs **clean verify** for pull requests and pushes to **dev** or 
 - Authentication, authorization, and document ownership are not implemented.
 - Document types currently provide only create and list operations.
 - Assigned types are not included in document responses.
-- Assigning a missing document or type does not yet produce a controlled 404 response.
 - Document type requests do not yet have Bean Validation constraints.
 - Lists are not paginated and have no guaranteed order.
-- There is no centralized REST error representation.
 - **contracts/openapi.yaml** represents an earlier API design and is not aligned with the current unversioned routes.
 - Frontend, search, OCR, messaging, and AI classification are not implemented.
 
@@ -211,8 +216,8 @@ Expected status: **200 OK**
 
 Expected body:
 
-~~~text
-DocFlow REST Server is running!
+~~~json
+{"status":"UP","message":"DocFlow REST Server is running!"}
 ~~~
 
 ### 3. Create a document
@@ -287,7 +292,7 @@ Replace 1 if the returned ID is different, then assign the type:
 curl -i -X POST "$BASE_URL/api/documents/$DOCUMENT_ID/types/$TYPE_ID"
 ~~~
 
-Expected status: **200 OK** with an empty body.
+Expected status: **200 OK** with JSON containing the assigned `documentId` and `typeId`.
 
 Because assigned types are not yet exposed in the document response, the persisted join row can be shown directly in PostgreSQL:
 
