@@ -1,0 +1,9 @@
+info:
+  name: Assign type to document
+  type: http
+  seq: 8
+http:
+  method: POST
+  url: '{{baseUrl}}/api/documents/{{documentId}}/types/{{typeId}}'
+docs: Uses documentId and typeId from the environment or captured by the create requests. Success returns
+  JSON containing documentId and typeId. Assigned types are not yet included in document responses.

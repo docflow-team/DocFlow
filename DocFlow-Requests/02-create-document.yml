@@ -1,0 +1,25 @@
+info:
+  name: Create document metadata
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: '{{baseUrl}}/api/documents'
+  headers:
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "filename": "invoice.pdf",
+        "contentType": "application/pdf",
+        "description": "October electricity invoice"
+      }
+runtime:
+  scripts:
+  - type: after-response
+    code: |
+      if (res.status === 201) {
+        bru.setVar("documentId", res.body.id);
+      }

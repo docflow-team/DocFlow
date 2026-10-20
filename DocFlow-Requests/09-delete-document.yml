@@ -1,0 +1,8 @@
+info:
+  name: Delete document
+  type: http
+  seq: 9
+http:
+  method: DELETE
+  url: '{{baseUrl}}/api/documents/{{documentId}}'
+docs: Deletes the document identified by documentId and its type assignments. Shared document types remain.

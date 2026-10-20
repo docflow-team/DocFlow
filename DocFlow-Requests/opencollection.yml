@@ -1,0 +1,20 @@
+opencollection: 1.0.0
+info:
+  name: DocFlow-Requests
+request:
+  headers:
+  - name: Accept
+    value: application/json
+bundled: false
+extensions:
+  ignore:
+  - node_modules
+  - .git
+docs: |
+  One request per implemented endpoint operation. Select the Local environment and set baseUrl, documentId and typeId as needed. Create document and create type also capture the returned IDs as runtime variables for subsequent calls.
+
+  POST and PUT send JSON metadata. Type names must be unique. PDF upload and authentication are not implemented.
+
+  Routes follow README.md, docs/sprint-summary.md and the current controllers. contracts/openapi.yaml contains older /api/v1 routes; docs/architecture.md describes the planned API.
+
+  Format reference: https://docs.usebruno.com/opencollection-yaml/overview

@@ -1,0 +1,26 @@
+info:
+  name: Create document type
+  type: http
+  seq: 6
+http:
+  method: POST
+  url: '{{baseUrl}}/api/document-types'
+  headers:
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "name": "Invoice",
+        "description": "Invoices and payment requests"
+      }
+runtime:
+  scripts:
+  - type: after-response
+    code: |
+      if (res.status === 201) {
+        bru.setVar("typeId", res.body.id);
+      }
+docs: Type names must be unique. Change the example name if Invoice already exists. The API currently
+  has no endpoint to delete types.

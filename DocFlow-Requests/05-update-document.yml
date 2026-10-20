@@ -1,0 +1,19 @@
+info:
+  name: Replace document metadata
+  type: http
+  seq: 5
+http:
+  method: PUT
+  url: '{{baseUrl}}/api/documents/{{documentId}}'
+  headers:
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "filename": "invoice-october.pdf",
+        "contentType": "application/pdf",
+        "description": null
+      }
+docs: PUT replaces all editable metadata. filename and contentType are required; null clears description.
