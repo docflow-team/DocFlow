@@ -32,6 +32,7 @@ class DocumentControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
                 .setValidator(validator)
                 .build();
     }
@@ -45,7 +46,9 @@ class DocumentControllerTest {
 
         // Act & Assert
         mockMvc.perform(get("/api/documents/999"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(404));
 
         verify(documentService).getDocumentById(999L);
     }
@@ -67,6 +70,7 @@ class DocumentControllerTest {
         // Act & Assert
         mockMvc.perform(get("/api/documents/1"))
                 .andExpect(status().isOk())
+                .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.filename").value("rechnung.pdf"))
                 .andExpect(jsonPath("$.contentType").value("application/pdf"))
                 .andExpect(jsonPath("$.description").value("Stromrechnung"));
@@ -92,6 +96,7 @@ class DocumentControllerTest {
         // Act & Assert
         mockMvc.perform(get("/api/documents"))
                 .andExpect(status().isOk())
+                .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].filename").value("rechnung.pdf"))
                 .andExpect(jsonPath("$[1].filename").value("vertrag.pdf"));
@@ -123,6 +128,7 @@ class DocumentControllerTest {
                         .contentType("application/json")
                         .content(json))
                 .andExpect(status().isCreated())
+                .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.filename").value("rechnung.pdf"))
                 .andExpect(jsonPath("$.description").value("Rechnung"));
 
@@ -156,6 +162,7 @@ class DocumentControllerTest {
                         .contentType("application/json")
                         .content(json))
                 .andExpect(status().isOk())
+                .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.filename").value("neu.pdf"))
                 .andExpect(jsonPath("$.description").value("Neue Beschreibung"));
 
@@ -185,7 +192,9 @@ class DocumentControllerTest {
         mockMvc.perform(put("/api/documents/{id}", id)
                         .contentType("application/json")
                         .content(json))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(404));
 
         verify(documentService).updateDocument(
                 eq(id), any(Document.class));
@@ -202,7 +211,8 @@ class DocumentControllerTest {
 
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}", id))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
 
         verify(documentService).deleteDocument(id);
     }
@@ -219,7 +229,9 @@ class DocumentControllerTest {
 
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}", id))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(404));
 
         verify(documentService).deleteDocument(id);
     }
@@ -241,7 +253,9 @@ class DocumentControllerTest {
         mockMvc.perform(post("/api/documents")
                         .contentType("application/json")
                         .content(json))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(400));
 
         verify(documentService, never())
                 .createDocument(any(Document.class));
@@ -262,10 +276,56 @@ class DocumentControllerTest {
                         documentId,
                         typeId
                 ))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.documentId").value(documentId))
+                .andExpect(jsonPath("$.typeId").value(typeId));
 
         verify(documentService)
                 .addDocumentType(documentId, typeId);
     }
 
+
+    @Test
+    void addDocumentTypeShouldReturnJson404WhenResourceIsMissing() throws Exception {
+        doThrow(new java.util.NoSuchElementException())
+                .when(documentService).addDocumentType(1L, 999L);
+
+        mockMvc.perform(post("/api/documents/1/types/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void malformedJsonShouldReturnJson400() throws Exception {
+        mockMvc.perform(post("/api/documents")
+                        .contentType("application/json")
+                        .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void nonJsonRequestBodyShouldReturnJson415() throws Exception {
+        mockMvc.perform(post("/api/documents")
+                        .contentType("text/plain")
+                        .content("document"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(415));
+    }
+
+    @Test
+    void unexpectedFailureShouldReturnJsonWithoutInternalDetails() throws Exception {
+        when(documentService.getAllDocuments())
+                .thenThrow(new IllegalStateException("Private database details"));
+
+        mockMvc.perform(get("/api/documents"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.detail").value("An unexpected error occurred"));
+    }
 }

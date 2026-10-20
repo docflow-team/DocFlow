@@ -1,6 +1,7 @@
 package com.docflow.backend.controller;
 
 import com.docflow.backend.dto.DocumentRequest;
+import com.docflow.backend.dto.DocumentTypeAssignmentResponse;
 import com.docflow.backend.dto.DocumentResponse;
 import com.docflow.backend.entity.Document;
 import com.docflow.backend.mapper.DocumentMapper;
@@ -8,13 +9,15 @@ import com.docflow.backend.service.DocumentService;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping(value = "/api/documents", produces = MediaType.APPLICATION_JSON_VALUE)
 public class DocumentController {
 
     private final DocumentService documentService;
@@ -23,7 +26,7 @@ public class DocumentController {
         this.documentService = documentService;
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentResponse createDocument(@Valid @RequestBody DocumentRequest request) {
         Document document = DocumentMapper.toEntity(request);
@@ -46,10 +49,10 @@ public class DocumentController {
         return documentService.getDocumentById(id)
                 .map(DocumentMapper::toResponse)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<DocumentResponse> updateDocument(
             @PathVariable Long id,
             @Valid @RequestBody DocumentRequest request) {
@@ -59,7 +62,7 @@ public class DocumentController {
         return documentService.updateDocument(id, updatedDocument)
                 .map(DocumentMapper::toResponse)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
     }
 
     @DeleteMapping("/{id}")
@@ -68,14 +71,15 @@ public class DocumentController {
             return ResponseEntity.noContent().build();
         }
 
-        return ResponseEntity.notFound().build();
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found");
     }
 
     @PostMapping("/{documentId}/types/{typeId}")
-    public void addDocumentType(
+    public DocumentTypeAssignmentResponse addDocumentType(
             @PathVariable Long documentId,
             @PathVariable Long typeId) {
 
         documentService.addDocumentType(documentId, typeId);
+        return new DocumentTypeAssignmentResponse(documentId, typeId);
     }
 }

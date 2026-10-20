@@ -6,12 +6,13 @@ import com.docflow.backend.dto.DocumentTypeResponse;
 import com.docflow.backend.entity.DocumentType;
 import com.docflow.backend.service.DocumentTypeService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/document-types")
+@RequestMapping(value = "/api/document-types", produces = MediaType.APPLICATION_JSON_VALUE)
 public class DocumentTypeController {
 
     private final DocumentTypeService service;
@@ -20,7 +21,7 @@ public class DocumentTypeController {
         this.service = service;
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentTypeResponse create(
             @RequestBody DocumentTypeRequest request) {

@@ -32,6 +32,7 @@ class DocumentTypeControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }
 
@@ -61,6 +62,7 @@ class DocumentTypeControllerTest {
                         .contentType("application/json")
                         .content(json))
                 .andExpect(status().isCreated())
+                .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Invoice"))
                 .andExpect(jsonPath("$.description").value("Invoice document"));
@@ -89,6 +91,7 @@ class DocumentTypeControllerTest {
         // Act & Assert
         mockMvc.perform(get("/api/document-types"))
                 .andExpect(status().isOk())
+                .andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].name").value("Invoice"))
                 .andExpect(jsonPath("$[1].name").value("Contract"));
