@@ -13,7 +13,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties = {
-		"spring.datasource.url=jdbc:h2:mem:docflow;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+		"spring.datasource.url=jdbc:h2:mem:docflow;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS api",
 		"spring.datasource.username=sa",
 		"spring.datasource.password=",
 		"spring.jpa.hibernate.ddl-auto=create-drop"

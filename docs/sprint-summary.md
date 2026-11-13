@@ -6,6 +6,8 @@
 
 **Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature. Sprint 2 has moved the application into a Maven API module and separated its HTTP, business and persistence boundaries using MapStruct, without changing its HTTP behavior.
 
+User persistence, password hashing and explicit first-admin bootstrap are now implemented. Authentication endpoints and document ownership are still pending. Normal API startup uses `ddl-auto=update` in the `api` schema, retaining existing rows across restarts.
+
 ## Sprint goal
 
 Sprint 1 established DocFlow as a Spring Boot REST application. The current application manages document metadata in PostgreSQL and exposes the required health and document CRUD endpoints.
@@ -62,6 +64,9 @@ The assignment is persisted but is not yet included in the document response. It
 - MapStruct 1.6.3 for DTO/model and entity/model boundaries, with strict unmapped-target checks
 - Application services and business repository interfaces, backed by JPA adapters
 - Service-owned transactions, read-only queries and disabled Open Session in View
+- Separate User business/JPA models, normalized unique identifiers and persisted account state
+- Spring Security crypto-only dependency for delegating bcrypt password hashing
+- Explicit non-web first-admin bootstrap with schema validation
 - Constructor injection in controllers and services
 - Jakarta Bean Validation for document requests
 - Maven Wrapper for reproducible builds
@@ -91,6 +96,7 @@ backend/
         ├── BackendApplication.java
         ├── api/                    Health endpoint and shared error handling
         ├── configuration/          Shared MapStruct configuration
+        ├── identity/               User domain/application/persistence, hashing and bootstrap
         └── document/
             ├── api/                Controllers, HTTP DTOs and DTO/model mappers
             ├── application/        Service interfaces/implementations and repository ports
@@ -149,7 +155,9 @@ The application uses PostgreSQL by default. The main variables are documented in
 | API_PORT | 8080 | Backend host port with Docker Compose |
 | SERVER_PORT | 8080 | Backend port when Java is started directly |
 
-Hibernate currently uses **spring.jpa.hibernate.ddl-auto=update**. It updates the schema at startup, while PostgreSQL data is retained in the named **postgres18_data** volume. Changing credentials in **.env** does not change the credentials of an already initialized database volume.
+Hibernate now uses **spring.jpa.hibernate.ddl-auto=update** and default schema **api**. Normal API startup applies supported schema changes and retains existing rows, including user accounts, in the named **postgres18_data** volume. Column renames, changed constraints and new required fields with existing rows may need explicit SQL changes or a deliberate database reset. Disposable tests retain `create-drop`; bootstrap retains `validate`. `infra/postgres/01-api-schema.sql` provisions the namespace only; the table definitions come from JPA. Existing `public`-schema records are not migrated. Changing credentials in **.env** does not change the credentials of an already initialized database volume.
+
+The explicit `bootstrap-admin` profile uses **validate**, starts without an HTTP server and exits after its work. It creates an enabled initial ADMIN with a temporary-password flag and token version 0 only when no account exists; repeating it preserves existing credentials. Username/email lookup is normalized, and both identifiers have separate unique constraints. Only encoded bcrypt passwords are persisted; the 72-byte limit is checked before hashing and comparison. Setup and credential input commands are in README. Authentication itself remains pending.
 
 ## Tests and continuous integration
 
@@ -167,6 +175,12 @@ Layering verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passe
 
 The image rebuilt successfully after the layering changes. An isolated Compose deployment with PostgreSQL passed **24 HTTP checks** across all nine operations, including reads and metadata updates after assignment, repeated assignment, description clearing and shared-type preservation after deletion. The temporary containers, network and database volume were removed.
 
+User foundation verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **51 tests, 0 failures, 0 errors, 0 skipped**. Added tests cover identifier normalization/uniqueness, account-state persistence, bcrypt hashing and matching without password normalization, UTF-8 byte limits, first-admin creation, safe repeat behavior and invalid bootstrap configuration without secret echoing.
+
+The user-foundation Docker image built successfully. An isolated PostgreSQL/Compose check passed **28 HTTP checks** plus database/bootstrap checks: all four mapped tables were in `api`, normal startup created no account, explicit bootstrap stored the expected normalized admin state and bcrypt hash, and repeating bootstrap preserved credentials and document data. The initial verification used the former `create` setting and demonstrated table resets; the follow-up verification for `update` is recorded below. Temporary containers, network and database volume were removed; existing project data was untouched.
+
+Schema-policy follow-up on 13 November 2026: `mvnw.cmd -B -ntp verify` passed **51 tests, 0 failures, 0 errors, 0 skipped**. The Docker image build and Compose configuration passed. A fresh isolated PostgreSQL deployment using `update` passed **30 HTTP checks**, initial schema creation and repeat-bootstrap checks. A normal API restart preserved the administrator and its password hash, document metadata, document types and assignments. Disposable containers, network and database volume were removed; existing project data was untouched.
+
 Container verification on 13 November 2026: Compose configuration and the restructured Docker image build passed. An isolated Compose deployment of that image with PostgreSQL passed **15 HTTP checks across all nine endpoint operations**, covering the document/type workflow, generated/protected fields, JSON success/error media types, validation/malformed JSON (`400`), missing resources (`404`), response negotiation (`406`), unsupported request media types (`415`) and empty successful deletion (`204`). The temporary containers, network and database volume were removed; existing project data was untouched.
 
 Docker Compose verification on 20 October 2026: rebuilt the backend and checked all nine endpoint operations. Every response body used `application/json`; successful deletion returned an empty **204**. Validation/malformed JSON (**400**), missing resources (**404**), unacceptable response media type (**406**) and unsupported request media type (**415**) also returned JSON. The demo document was deleted; one uniquely named verification type remains because type deletion is not implemented.
@@ -182,6 +196,7 @@ The test suite covers:
 - Plain Java document invariants and protected metadata updates
 - Generated mapping boundaries, null values and type-ID conversion
 - Complete Spring application-context startup and adapter round trip with H2
+- User persistence/uniqueness, password hashing/limits and admin bootstrap behavior
 
 GitHub Actions runs **clean verify** for pull requests and pushes to **dev** or **main**. After successful tests, it also verifies the backend Docker image build. A coverage gate and PostgreSQL integration tests are not configured yet.
 
@@ -217,6 +232,8 @@ Change the password in **.env** for your local environment, then start the stack
 
 ~~~bash
 docker compose config --quiet
+docker compose up --detach --wait db
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/01-api-schema.sql'
 docker compose up --build --detach --wait
 docker compose ps
 ~~~
@@ -345,7 +362,7 @@ Expected status: **404 Not Found**
 docker compose down
 ~~~
 
-This retains the PostgreSQL volume. To deliberately delete all local DocFlow database data:
+This retains the PostgreSQL volume and existing API rows across the next normal startup. To deliberately delete all local DocFlow database data:
 
 ~~~bash
 docker compose down --volumes
@@ -368,6 +385,8 @@ set +a
 cd backend
 ./mvnw -pl apps/api spring-boot:run
 ~~~
+
+The `api` schema must be provisioned before startup; README contains the current schema and first-admin setup commands.
 
 Alternatively, build and run the executable JAR:
 

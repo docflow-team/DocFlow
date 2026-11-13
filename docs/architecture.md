@@ -14,7 +14,7 @@ This document records the intended architecture and agreed course requirements, 
 - Accepted defaults: owner-only document access, admin-maintained seven-label taxonomy, Gemini provider and Railway scheduled sessions with one hosting administrator.
 - Mobile deliverable: **React PWA**, confirmed by the user on 14 October 2026 as satisfying the smartphone-app requirement. No separate native/Capacitor project.
 - Infrastructure: pinned MinIO source build accepted; **Elasticsearch, Logstash and Kibana in containers both locally and during cloud sessions**. No continuous cloud operation.
-- Database schema: **`spring.jpa.hibernate.ddl-auto=create`**, following the lecturer recommendation and team decision. Hibernate recreates its mapped tables at application startup; their previous data is discarded. No Flyway migrations are planned.
+- Database schema: **`spring.jpa.hibernate.ddl-auto=update`**, the agreed development policy. Hibernate applies supported schema changes at application startup while retaining existing rows. No Flyway migrations are planned.
 
 Recommend a layered REST application with separate OCR, indexing and GenAI worker applications, plus a scheduled batch application. PostgreSQL owns structured data, MinIO stores files, Elasticsearch provides search, and RabbitMQ connects asynchronous processing. The course diagram explicitly specifies a monorepo with subprojects.
 
@@ -27,7 +27,7 @@ Docker Compose is the primary development and grading environment. Keep the requ
 | Course requirement | Design response |
 | --- | --- |
 | JDK LTS >=25, Spring Boot >=3.5/4 | Java 25 LTS and Spring Boot 4.1.1 |
-| REST, PostgreSQL ORM, repository pattern | Spring MVC, Spring Data JPA, Hibernate-generated tables (`ddl-auto=create`) |
+| REST, PostgreSQL ORM, repository pattern | Spring MVC, Spring Data JPA, Hibernate-generated tables (`ddl-auto=update`) |
 | Separate business and persistence entities; mapping framework | HTTP DTOs, business models, JPA entities, MapStruct |
 | Business components through interfaces; DI and validation | Application services, ports/adapters, constructor injection, Jakarta validation |
 | Upload, edit, delete, metadata, tags | Document API and React dashboard/detail views |
@@ -117,16 +117,18 @@ Test custom conversions, required/null values and protected fields. Straightforw
 Use the following setting for the API and the batch application that own JPA-managed tables:
 
 ```properties
-spring.jpa.hibernate.ddl-auto=create
+spring.jpa.hibernate.ddl-auto=update
 ```
 
-Hibernate generates tables, constraints and sequences from the entity mappings, dropping and recreating the mapped database objects whenever the application's persistence context starts. Existing rows in those tables are lost, including on application restart or redeployment. This is intentional for the coursework environment and applies to local/grading and scheduled cloud sessions. `create` does not additionally drop the tables on normal shutdown, unlike `create-drop`. PostgreSQL and the target database must already be available.
+Hibernate initializes missing mapped tables and applies supported schema changes from entity mappings while retaining existing rows across restarts and redeployments. This applies to local/grading and scheduled cloud sessions. Automatic update is a development convenience, not a versioned migration system: column renames, changed constraints and new required fields with existing rows may need explicit SQL changes or a deliberate database reset. PostgreSQL and the target database must already be available. Disposable integration tests use `create-drop`. If data-preserving releases become a requirement, adopt versioned migrations and change normal startup to `validate`.
 
 Do not use Flyway or a competing table-creation script for these same tables. Provision the API and `audit` namespaces explicitly before Hibernate needs them; keep each application's entity scanning and schema mappings restricted to its owned tables. Workers without JPA-owned tables must not initialize the API or audit tables. Use a long-lived batch application with Spring scheduling; no Spring Batch framework metadata or job repository is needed for the initial importer.
 
+The API uses the `api` schema, provisioned by `infra/postgres/01-api-schema.sql`; that script creates only the namespace. Provision `audit` with the batch feature. The explicit `bootstrap-admin` profile is a one-off validation-only command: it runs without a web server and validates the existing API tables, then exits. It must retain `ddl-auto=validate`; normal API restarts preserve accounts and do not require a fresh bootstrap. Bootstrap skips creation if any account exists and never resets its credentials. It is run by one operator at a time; concurrent bootstrap commands are outside the initial setup procedure. See README for commands.
+
 Use repeatable fixtures and the explicit admin bootstrap command after schema creation to prepare demonstrations. Resetting API tables loses users, document metadata, current classification suggestions, assignments and processing status; resetting batch tables loses imported access events and import markers. Idempotency guarantees apply while those records exist, not across a deliberate database reset.
 
-MinIO objects, RabbitMQ messages, Elasticsearch indexes and archived XML files are not reset by Hibernate. The reset runbook must pause consumers and explicitly reconcile or reset the relevant demonstration state before processing resumes, so stale jobs and search hits cannot refer to deleted records. Preserve reusable input fixtures separately and restage XML when a fresh import is needed. Named volumes preserve storage between container runs but do not override `ddl-auto=create`.
+MinIO objects, RabbitMQ messages, Elasticsearch indexes and archived XML files are not reset by Hibernate. For a deliberate database reset, the reset runbook must pause consumers and explicitly reconcile or reset the relevant demonstration state before processing resumes, so stale jobs and search hits cannot refer to deleted records. Preserve reusable input fixtures separately and restage XML when a fresh import is needed. Named volumes and `ddl-auto=update` preserve existing database rows between container runs; deleting a volume deliberately removes those rows.
 
 ### Persistence relationships and deletion
 
@@ -136,7 +138,7 @@ Deleting a document removes its owned rows and metadata in a database transactio
 
 Workers check document existence through a small internal API protected by a backend-only service credential before processing/writing results; API result consumers discard results for missing documents. This reduces stale work but does not eliminate a delete/worker race: a worker can still recreate an external object or index entry after checking. Accept this limitation for the student project and use manual cleanup or a fresh demo environment when needed. Do not claim atomic deletion across services.
 
-Test assignment removal, document deletion and preservation of shared categories/users against PostgreSQL. Keep batch audit document references as external identifiers rather than cross-schema JPA relationships, because API and audit tables are recreated independently.
+Test assignment removal, document deletion and preservation of shared categories/users against PostgreSQL. Keep batch audit document references as external identifiers rather than cross-schema JPA relationships, because API and audit tables have independent ownership and lifecycles.
 
 ### Processing flow
 
@@ -327,7 +329,7 @@ Deploy only through manual workflows after successful CI and stop paid compute a
 
 The batch job imports **external access logs**, not OCR jobs. Supply an XSD and sample XML containing source-system ID, stable event ID, document reference, timestamp and action. Disable external XML entity resolution. Deduplicate by source/event ID and file checksum; commit audit rows/import status before archiving. Keep failed files and reasons separately; reruns must not duplicate data.
 
-Configure schedule, timezone, input path, filename pattern and archive/error paths. Proposed daily schedule: 01:00 `Europe/Vienna`. Run the separate batch application as a long-lived process using Spring `@Scheduled`, preserving literal folder semantics. Each scheduled invocation calls the import service within the running application; it must not restart Spring or recreate the persistence context. With `ddl-auto=create`, a new application process would erase its previous audit/import records. Restarting the application still intentionally resets those tables; restarting it for every daily run is not the design. Hosted files need a delivery path: API uploads XML to a MinIO inbox prefix and the batch worker stages it into its own folder; it cannot mount the API's disk. Keep this staging adapter small; no general file-delivery framework is needed.
+Configure schedule, timezone, input path, filename pattern and archive/error paths. Proposed daily schedule: 01:00 `Europe/Vienna`. Run the separate batch application as a long-lived process using Spring `@Scheduled`, preserving literal folder semantics. Each scheduled invocation calls the import service within the running application; it must not restart Spring or recreate the persistence context. `ddl-auto=update` preserves audit/import records across application restarts; restarting for every daily run is still unnecessary. Hosted files need a delivery path: API uploads XML to a MinIO inbox prefix and the batch worker stages it into its own folder; it cannot mount the API's disk. Keep this staging adapter small; no general file-delivery framework is needed.
 
 During scheduled cloud sessions, run the separate batch application with its own volume and demonstrate both the configured scheduler and a controlled manual trigger. It cannot run daily while the deployment is stopped. The local Compose deployment provides the daily scheduler when running. No continuous cloud execution is planned; this is a confirmed team decision. Object-storage delivery is only a staging mechanism; retain the required folder scanning, configured pattern and archive behavior.
 
@@ -397,7 +399,7 @@ Use a manually triggered GitHub Actions workflow to deploy a selected passing `m
 
 The session owner sets a shutdown reminder, runs the stop workflow and checks that paid compute has stopped. Keep the provider spending controls and bounded AI usage described in section 7. This is a deliberate manual operational responsibility; no automatic time-based shutdown guarantee is claimed.
 
-Because `ddl-auto=create` resets tables, stop the old applications/workers before starting a fresh demo session. Let the API and long-lived batch application initialize their own tables once, reset stale demo messages/indexes/files as needed, bootstrap sample data, then start processing. Keep one schema-owning instance per set of tables. If deployment fails, manually redeploy a known-good commit and prepare fresh demonstration data; data-preserving rollback is outside scope.
+Normal deployments use `ddl-auto=update` and retain existing rows. Let the API and long-lived batch application initialize/update their owned tables before processing. Bootstrap sample data only when needed. For a deliberate fresh-data demonstration, stop applications/workers, reset the database and stale demo messages/indexes/files together, then initialize and bootstrap before restarting processing. Keep one schema-owning instance per set of tables. If deployment fails, manually redeploy a known-good commit only with a compatible schema, or prepare a fresh demonstration database; automatic data-preserving rollback is outside scope.
 
 Perform one small live AI check before demonstrations, since stubbed tests cannot verify provider integration. Document clean-checkout startup/test commands so grading can run locally without paid hosting.
 

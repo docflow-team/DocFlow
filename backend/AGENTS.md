@@ -63,9 +63,9 @@ Guidelines for implementing the DocFlow Java backend. The authoritative design i
 
 ## Persistence and Schema Lifecycle
 
-- Use JPA entities and Spring Data repositories with `spring.jpa.hibernate.ddl-auto=create` in the API and batch applications. Hibernate recreates mapped tables at startup, intentionally losing previous rows. Do not add Flyway or competing table-creation scripts.
+- Use JPA entities and Spring Data repositories with `spring.jpa.hibernate.ddl-auto=update` in the API and batch applications. Hibernate applies supported schema changes at startup while retaining existing rows. Renames, changed constraints and new required fields may require explicit SQL changes or a deliberate development database reset; automatic update is not a versioned migration system. Keep disposable tests on `create-drop` and the first-admin bootstrap on `validate`. Do not add Flyway or competing table-creation scripts.
 - Provision the database and API/audit namespaces first. Restrict entity scanning/mappings to owned tables. Workers without owned JPA tables must not initialize API/audit tables. Keep one schema-owning instance per set of tables.
-- Use repeatable fixtures and explicit admin bootstrap after initialization. Volumes do not prevent Hibernate resets. Pause workers and reset/reconcile stale demo messages, indexes and objects before processing resumes; retain reusable inputs separately.
+- Use repeatable fixtures and explicit admin bootstrap after initialization. Normal restarts retain rows in the database volume. For a deliberate database reset, pause workers and reset/reconcile stale demo messages, indexes and objects before processing resumes; retain reusable inputs separately.
 - Entities: Document, Tag/DocumentTag, Category, ClassificationSuggestion, DocumentCategory, User, AccessLogEntry and BatchImport. Retain many-to-many category assignments for the additional use case.
 - Store current stage statuses, request IDs and last errors on Document, together with summary/text references. Keep only current suggestions. Historical runs, feedback, processing-job, outbox and consumed-event tables are deferred.
 - Every document has an owner; user-data queries are owner-scoped. Admin status does not grant access to other users' documents.
@@ -104,7 +104,7 @@ Guidelines for implementing the DocFlow Java backend. The authoritative design i
 ## Batch Application
 
 - Separate long-lived application using Spring `@Scheduled`; default daily schedule 01:00 Europe/Vienna. Configure schedule, timezone, input path, filename pattern and archive/error paths.
-- Scheduled invocations call the import service without restarting Spring or its persistence context. Each application restart with `ddl-auto=create` resets audit/import tables; do not start a new process for each daily run.
+- Scheduled invocations call the import service without restarting Spring or its persistence context. `ddl-auto=update` retains audit/import records across application restarts; do not start a new process for each daily run.
 - Provide XSD and sample XML; disable XXE. Deduplicate by source/event ID and checksum. Commit entries/import status before archiving; preserve failed files/reasons. Deduplication lasts within the current database lifecycle.
 - Own audit-schema JPA mappings, not API tables. In cloud sessions, API upload stages XML through a MinIO inbox into the worker folder; retain folder scanning/pattern/archive behavior.
 - Demonstrating a configurable daily scheduler is confirmed sufficient. Exercise a near-future scheduled trigger, verify imported rows/archive outcome and restore the daily configuration. Continuous execution between sessions is not required; a manual trigger only supplements the scheduler check.
@@ -142,7 +142,7 @@ Guidelines for implementing the DocFlow Java backend. The authoritative design i
 
 1. Validated DTOs and documented endpoints matching the current OpenAPI contract.
 2. Application use case with authorization/transactions and useful domain behavior.
-3. Owner-scoped queries, correct JPA relationships and schema generation with `ddl-auto=create`.
+3. Owner-scoped queries, correct JPA relationships and schema initialization/update with `ddl-auto=update`.
 4. Constructor-injected ports/adapters for external I/O; MapStruct boundaries with protected fields.
 5. Current request/status handling, bounded retries and visible/manual recovery for asynchronous work.
 6. Correlation-aware logging and relevant success/validation/missing/wrong-owner tests; focused integration checks for the feature.

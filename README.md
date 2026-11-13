@@ -14,7 +14,7 @@ Copy the committed example configuration to the ignored local `.env` file:
 cp .env.example .env
 ```
 
-Replace `change-me-local-only` in `.env` with your own local PostgreSQL password. The example file contains no real secret, and `.env` must not be committed.
+Replace the example `POSTGRES_PASSWORD` in `.env` with your own local PostgreSQL password. The example file contains no real secret, and `.env` must not be committed.
 
 ## Run with Docker Compose
 
@@ -22,6 +22,8 @@ Run these commands from the repository root:
 
 ```bash
 docker compose config --quiet
+docker compose up --detach --wait db
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/01-api-schema.sql'
 docker compose up --build --detach --wait
 docker compose ps
 ```
@@ -45,6 +47,47 @@ docker compose down
 
 PostgreSQL uses a named volume. Changing the password in `.env` does not change the password of an already initialized database volume.
 
+The API uses `ddl-auto=update` and retains data across restarts. See [schema lifecycle](docs/architecture.md#database-schema-lifecycle) for limitations and reset behavior.
+
+## Bootstrap the first administrator
+
+After starting the stack, run the command for your shell once. If an account already exists, bootstrap skips creation.
+
+macOS/Linux (Bash or Zsh):
+
+```bash
+(
+    export DOCFLOW_BOOTSTRAP_USERNAME=admin
+    export DOCFLOW_BOOTSTRAP_EMAIL=admin@example.invalid
+    printf "Initial admin password: "
+    IFS= read -r -s DOCFLOW_BOOTSTRAP_PASSWORD || exit
+    printf "\n"
+    export DOCFLOW_BOOTSTRAP_PASSWORD
+    docker compose run --rm --no-deps -T \
+        -e DOCFLOW_BOOTSTRAP_USERNAME -e DOCFLOW_BOOTSTRAP_EMAIL -e DOCFLOW_BOOTSTRAP_PASSWORD \
+        backend --spring.profiles.active=bootstrap-admin
+)
+```
+
+Windows (PowerShell):
+
+```powershell
+$env:DOCFLOW_BOOTSTRAP_USERNAME = 'admin'
+$env:DOCFLOW_BOOTSTRAP_EMAIL = 'admin@example.invalid'
+$bootstrapSecret = Read-Host 'Initial admin password' -AsSecureString
+$env:DOCFLOW_BOOTSTRAP_PASSWORD = [System.Net.NetworkCredential]::new('', $bootstrapSecret).Password
+try {
+    docker compose run --rm --no-deps -T `
+        -e DOCFLOW_BOOTSTRAP_USERNAME -e DOCFLOW_BOOTSTRAP_EMAIL -e DOCFLOW_BOOTSTRAP_PASSWORD `
+        backend --spring.profiles.active=bootstrap-admin
+} finally {
+    Remove-Item Env:\DOCFLOW_BOOTSTRAP_USERNAME, Env:\DOCFLOW_BOOTSTRAP_EMAIL, Env:\DOCFLOW_BOOTSTRAP_PASSWORD
+    $bootstrapSecret.Dispose()
+}
+```
+
+Choose a password of at least 8 characters and at most 72 UTF-8 bytes. The administrator must change it at first login. Authentication endpoints are not implemented yet.
+
 ## Build and test
 
 Run from `backend/`:
@@ -67,6 +110,8 @@ Alternatively, after `clean verify`, run the packaged application from `backend/
 ```bash
 java -jar apps/api/target/api-0.0.1-SNAPSHOT.jar
 ```
+
+For direct Java startup, provision the `api` schema using the Compose command above.
 
 ## Current API
 
