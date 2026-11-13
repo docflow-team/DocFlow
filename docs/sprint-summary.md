@@ -2,6 +2,8 @@
 
 **Course:** SWEN3 / BIF5
 
+**Current sprint:** Sprint 2
+
 **Updated:** 13 November 2026
 
 ## Delivered functionality
@@ -56,16 +58,6 @@ GitHub Actions (`backend-ci.yml` and `frontend-ci.yml`) builds `docflow-minio:ci
 ## Sprint 2 scope and remaining work
 
 Sprint 2 delivers all planned authentication and owner-only PDF management capabilities through React/Nginx and local Docker Compose, including manual categories, normalized tags, automated PostgreSQL/MinIO integration verification and JaCoCo >70% coverage enforcement. Account creation stays API-only in Sprint 2; see [agreed contracts](architecture.md#sprint-2-contract-decisions) for contract boundaries.
-
-### Sprint 2 implementation summary
-
-1. **Contracts and layered API architecture:** Defined the Sprint 2 REST contracts ([OpenAPI](../contracts/openapi.yaml)) and structured `backend/apps/api` with separated HTTP DTOs, domain models, JPA entities, service/repository/storage interfaces and strict MapStruct mappers (`unmappedTargetPolicy = ERROR`).
-2. **Identity, bootstrap and authentication:** Implemented PostgreSQL-backed user accounts (`api.users`), BCrypt password hashing, explicit `--spring.profiles.active=bootstrap-admin` seeding, username/email login, 15-minute bearer JWTs validated against `enabled` and `tokenVersion`, first-login temporary-password enforcement, password rotation, logout revocation and `ADMIN`-only user creation (`POST /api/v1/admin/users`).
-3. **Storage, PDFs, categories and tags:** Added the pinned source-built MinIO Docker image (`infra/minio`), private bucket initialization, validated multipart PDF upload/listing/details/download/metadata-edit/deletion returning `202 Accepted` with `NOT_STARTED` processing stages, seven seeded manual categories (`api.document_types`) with replacement/clearing (`PUT /api/v1/documents/{id}/categories`), normalized deduplicated per-document tags (`api.tags`) with replacement/clearing and conflict handling, and strict owner isolation (`404` for non-owners including `ADMIN`).
-4. **React frontend and Nginx delivery:** Built the React/TypeScript/Vite SPA (`frontend/`) with CSS Modules, a typed fetch client, in-memory JWT session management, protected navigation, login/password-change flows, paginated document list, upload form, document detail/edit/category/tag/download/delete UI, responsive layouts and an unprivileged Nginx container wired into [docker-compose.yaml](../docker-compose.yaml).
-5. **Real-storage integration, coverage and CI:** Added `RealStorageIntegrationIT` (Testcontainers `2.0.5` with `postgres:18.6` and source-built/reusable MinIO under `-Pintegration-tests`), configured JaCoCo `0.8.14` (`0.71` minimum line coverage, excluding `*MapperImpl`), updated [backend-ci.yml](../.github/workflows/backend-ci.yml) and verified the full stack end-to-end through Nginx.
-
-Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background OCR, indexing, summary, classification and Sprint 3-6 capabilities arrive in subsequent sprints.
 
 ## Current limitations
 
