@@ -7,6 +7,9 @@ Guidelines for implementing the DocFlow Java backend. The authoritative design i
 - This is a student coursework project, not a production-ready product. Prioritize learning, the course objectives and code the whole team can understand and explain.
 - Keep implementations and repository setup as simple as possible while meeting the agreed requirements. Prefer straightforward flows, small classes and existing framework features; add abstractions, configuration switches or infrastructure only for a concrete course objective or demonstrated need.
 - Do not add production hardening, operational automation, exhaustive failure matrices or speculative extensibility merely because they would be useful in a commercial system. Preserve basic safety, ownership rules, meaningful validation and the required architecture/tests; document accepted limitations instead of engineering around every edge case.
+- Reuse existing services, mappers, request examples and test fixtures before adding alternatives. Avoid duplicate validation and error handling within a layer; retain checks needed at separate trust boundaries.
+- Reduce file count where responsibilities belong together. Keep single-use DTO records, exceptions and helpers with their consumer when clearer; preserve required layers, interfaces and mapping, and keep unrelated responsibilities separate.
+- Before handoff, review changes for unnecessary code, repeated documentation and redundant tests. Remove duplication while retaining meaningful coverage of distinct behavior.
 
 ## Project Goals
 

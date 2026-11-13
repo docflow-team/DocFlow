@@ -1,6 +1,7 @@
 package at.fhtw.docflow.document.api;
 
 import at.fhtw.docflow.api.ApiExceptionHandler;
+import at.fhtw.docflow.document.api.DocumentController.DocumentRequest;
 
 import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.application.DocumentService;
@@ -8,17 +9,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class DocumentControllerTest {
 
+    private final DocumentMapper mapper = Mappers.getMapper(DocumentMapper.class);
     private DocumentService documentService;
     private MockMvc mockMvc;
 
@@ -27,26 +30,31 @@ class DocumentControllerTest {
         documentService = mock(DocumentService.class);
 
         DocumentController controller =
-                new DocumentController(documentService, org.mapstruct.factory.Mappers.getMapper(DocumentMapper.class));
-
-        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
-        validator.afterPropertiesSet();
+                new DocumentController(documentService, mapper);
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
                 .setControllerAdvice(new ApiExceptionHandler())
-                .setValidator(validator)
                 .build();
+    }
+
+    @Test
+    void requestMappingLeavesServerControlledFieldsUnsetAndAllowsNullDescription() {
+        Document document = mapper.toDomain(new DocumentRequest("file.pdf", "application/pdf", null));
+
+        assertNull(document.getId());
+        assertNull(document.getOwnerId());
+        assertNull(document.getCreatedAt());
+        assertTrue(document.getDocumentTypeIds().isEmpty());
+        assertNull(document.getDescription());
     }
 
     @Test
     void getDocumentByIdShouldReturn404WhenNotFound() throws Exception {
 
-        // Arrange
         when(documentService.getDocumentById(999L))
                 .thenReturn(Optional.empty());
 
-        // Act & Assert
         mockMvc.perform(get("/api/documents/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType("application/json"))
@@ -58,7 +66,6 @@ class DocumentControllerTest {
     @Test
     void getDocumentByIdShouldReturn200WhenFound() throws Exception {
 
-        // Arrange
         Document document = Document.create(
                 "rechnung.pdf",
                 "application/pdf",
@@ -68,7 +75,6 @@ class DocumentControllerTest {
         when(documentService.getDocumentById(1L))
                 .thenReturn(Optional.of(document));
 
-        // Act & Assert
         mockMvc.perform(get("/api/documents/1"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/json"))
@@ -82,7 +88,6 @@ class DocumentControllerTest {
     @Test
     void getAllDocumentsShouldReturn200() throws Exception {
 
-        // Arrange
         Document doc1 = Document.create(
                 "rechnung.pdf", "application/pdf", "Rechnung"
         );
@@ -94,7 +99,6 @@ class DocumentControllerTest {
         when(documentService.getAllDocuments())
                 .thenReturn(List.of(doc1, doc2));
 
-        // Act & Assert
         mockMvc.perform(get("/api/documents"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/json"))
@@ -108,7 +112,6 @@ class DocumentControllerTest {
     @Test
     void createDocumentShouldReturn201() throws Exception {
 
-        // Arrange
         Document document = Document.create(
                 "rechnung.pdf", "application/pdf", "Rechnung"
         );
@@ -124,7 +127,6 @@ class DocumentControllerTest {
             }
             """;
 
-        // Act & Assert
         mockMvc.perform(post("/api/documents")
                         .contentType("application/json")
                         .content(json))
@@ -139,7 +141,6 @@ class DocumentControllerTest {
     @Test
     void updateDocumentShouldReturn200() throws Exception {
 
-        // Arrange
         Long id = 1L;
 
         Document updated = Document.create(
@@ -158,7 +159,6 @@ class DocumentControllerTest {
             }
             """;
 
-        // Act & Assert
         mockMvc.perform(put("/api/documents/{id}", id)
                         .contentType("application/json")
                         .content(json))
@@ -174,7 +174,6 @@ class DocumentControllerTest {
     @Test
     void updateDocumentShouldReturn404WhenNotFound() throws Exception {
 
-        // Arrange
         Long id = 999L;
 
         when(documentService.updateDocument(
@@ -189,7 +188,6 @@ class DocumentControllerTest {
             }
             """;
 
-        // Act & Assert
         mockMvc.perform(put("/api/documents/{id}", id)
                         .contentType("application/json")
                         .content(json))
@@ -204,13 +202,11 @@ class DocumentControllerTest {
     @Test
     void deleteDocumentShouldReturn204() throws Exception {
 
-        // Arrange
         Long id = 1L;
 
         when(documentService.deleteDocument(id))
                 .thenReturn(true);
 
-        // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}", id))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
@@ -221,13 +217,11 @@ class DocumentControllerTest {
     @Test
     void deleteDocumentShouldReturn404WhenNotFound() throws Exception {
 
-        // Arrange
         Long id = 999L;
 
         when(documentService.deleteDocument(id))
                 .thenReturn(false);
 
-        // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}", id))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType("application/json"))
@@ -239,7 +233,6 @@ class DocumentControllerTest {
     @Test
     void createDocumentShouldReturn400WhenFilenameIsBlank() throws Exception {
 
-        // Arrange
         String json = """
             {
                 "filename": "",
@@ -248,7 +241,6 @@ class DocumentControllerTest {
             }
             """;
 
-        // Act & Assert
         mockMvc.perform(post("/api/documents")
                         .contentType("application/json")
                         .content(json))
@@ -263,11 +255,9 @@ class DocumentControllerTest {
     @Test
     void addDocumentTypeShouldReturn200() throws Exception {
 
-        // Arrange
         Long documentId = 1L;
         Long typeId = 2L;
 
-        // Act & Assert
         mockMvc.perform(post(
                         "/api/documents/{documentId}/types/{typeId}",
                         documentId,

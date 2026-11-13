@@ -39,7 +39,6 @@ class DocumentServiceTest {
     @Test
     void createDocumentShouldSaveDocument() {
 
-        // Arrange
         Document document = Document.create(
                 "rechnung.pdf",
                 "application/pdf",
@@ -49,17 +48,14 @@ class DocumentServiceTest {
         when(documentRepository.save(document))
                 .thenReturn(document);
 
-        // Act
         Document result = documentService.createDocument(document);
 
-        // Assert
         assertSame(document, result);
         verify(documentRepository).save(document);
     }
 
     @Test
     void getAllDocumentsShouldReturnDocuments() {
-        // Arrange
         Document doc1 = Document.create(
                 "rechnung.pdf", "application/pdf", "Rechung"
         );
@@ -72,10 +68,8 @@ class DocumentServiceTest {
 
         when(documentRepository.findAllByOwnerId(1L)).thenReturn(documents);
 
-        // Act
         List<Document> result = documentService.getAllDocuments();
 
-        // Assert
         assertEquals(2, result.size());
         assertEquals(documents, result);
         verify(documentRepository).findAllByOwnerId(1L);
@@ -84,7 +78,6 @@ class DocumentServiceTest {
     @Test
     void getDocumentByIdShouldReturnDocument() {
 
-        // Arrange
         Long id = 1L;
         Document document = Document.create(
                 "rechung.pdf", "application/pdf", "Rechnung"
@@ -93,10 +86,8 @@ class DocumentServiceTest {
         when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.of(document));
 
-        // Act
         Optional<Document> result = documentService.getDocumentById(id);
 
-        // Assert
         assertTrue(result.isPresent());
         assertSame(document, result.get());
         verify(documentRepository).findByIdAndOwnerId(id, 1L);
@@ -105,16 +96,13 @@ class DocumentServiceTest {
     @Test
     void getDocumentByIdShouldReturnEmptyWhenNotFound() {
 
-        // Arrange
         Long id = 999L;
 
         when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.empty());
 
-        // Act
         Optional<Document> result = documentService.getDocumentById(id);
 
-        // Assert
         assertTrue(result.isEmpty());
         verify(documentRepository).findByIdAndOwnerId(id, 1L);
     }
@@ -122,7 +110,6 @@ class DocumentServiceTest {
     @Test
     void updateDocumentShouldUpdateMetadata() {
 
-        // Arrange
         Long id = 1L;
 
         Document existing = Document.create(
@@ -139,11 +126,9 @@ class DocumentServiceTest {
         when(documentRepository.save(existing))
                 .thenReturn(existing);
 
-        // Act
         Optional<Document> result =
                 documentService.updateDocument(id, updated);
 
-        // Assert
         assertTrue(result.isPresent());
         assertEquals("neu.pdf", result.get().getFilename());
         assertEquals("application/pdf", result.get().getContentType());
@@ -156,7 +141,6 @@ class DocumentServiceTest {
     @Test
     void updateDocumentShouldReturnEmptyWhenNotFound() {
 
-        // Arrange
         Long id = 999L;
 
         Document updated = Document.create(
@@ -166,11 +150,9 @@ class DocumentServiceTest {
         when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.empty());
 
-        // Act
         Optional<Document> result =
                 documentService.updateDocument(id, updated);
 
-        // Assert
         assertTrue(result.isEmpty());
 
         verify(documentRepository).findByIdAndOwnerId(id, 1L);
@@ -198,42 +180,33 @@ class DocumentServiceTest {
     @Test
     void deleteDocumentShouldDeleteExistingDocument() {
 
-        // Arrange
         Long id = 1L;
 
-        when(documentRepository.existsByIdAndOwnerId(id, 1L)).thenReturn(true);
+        when(documentRepository.deleteByIdAndOwnerId(id, 1L)).thenReturn(true);
 
-        // Act
         boolean result = documentService.deleteDocument(id);
 
-        // Assert
         assertTrue(result);
-        verify(documentRepository).existsByIdAndOwnerId(id, 1L);
         verify(documentRepository).deleteByIdAndOwnerId(id, 1L);
     }
 
     @Test
     void deleteDocumentShouldReturnFalseWhenNotFound() {
 
-        // Arrange
         Long id = 999L;
 
-        when(documentRepository.existsByIdAndOwnerId(id, 1L)).thenReturn(false);
+        when(documentRepository.deleteByIdAndOwnerId(id, 1L)).thenReturn(false);
 
-        // Act
         boolean result = documentService.deleteDocument(id);
 
-        // Assert
         assertFalse(result);
 
-        verify(documentRepository).existsByIdAndOwnerId(id, 1L);
-        verify(documentRepository, never()).deleteByIdAndOwnerId(anyLong(), anyLong());
+        verify(documentRepository).deleteByIdAndOwnerId(id, 1L);
     }
 
     @Test
     void addDocumentTypeShouldAssignTypeToDocument() {
 
-        // Arrange
         Long documentId = 1L;
         Long typeId = 2L;
 
@@ -254,10 +227,8 @@ class DocumentServiceTest {
         when(documentTypeRepository.findById(typeId))
                 .thenReturn(Optional.of(documentType));
 
-        // Act
         documentService.addDocumentType(documentId, typeId);
 
-        // Assert
         assertTrue(document.getDocumentTypeIds().contains(typeId));
 
         verify(documentRepository).save(document);
@@ -266,14 +237,12 @@ class DocumentServiceTest {
     @Test
     void addDocumentTypeShouldThrowWhenDocumentNotFound() {
 
-        // Arrange
         Long documentId = 999L;
         Long typeId = 2L;
 
         when(documentRepository.findByIdAndOwnerId(documentId, 1L))
                 .thenReturn(Optional.empty());
 
-        // Act & Assert
         assertThrows(
                 NoSuchElementException.class,
                 () -> documentService.addDocumentType(documentId, typeId)
@@ -286,7 +255,6 @@ class DocumentServiceTest {
     @Test
     void addDocumentTypeShouldThrowWhenTypeNotFound() {
 
-        // Arrange
         Long documentId = 1L;
         Long typeId = 999L;
 
@@ -302,7 +270,6 @@ class DocumentServiceTest {
         when(documentTypeRepository.findById(typeId))
                 .thenReturn(Optional.empty());
 
-        // Act & Assert
         assertThrows(
                 NoSuchElementException.class,
                 () -> documentService.addDocumentType(documentId, typeId)

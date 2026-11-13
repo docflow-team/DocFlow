@@ -3,11 +3,14 @@ package at.fhtw.docflow.identity.api;
 import at.fhtw.docflow.identity.application.AuthenticationService;
 import at.fhtw.docflow.identity.security.JwtProperties;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-@org.springframework.context.annotation.Profile("!bootstrap-admin")
+@Profile("!bootstrap-admin")
 @RestController
 @RequestMapping(value = "/api/v1/auth", produces = MediaType.APPLICATION_JSON_VALUE)
 public class AuthenticationController {
@@ -36,5 +39,20 @@ public class AuthenticationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@Valid @RequestBody PasswordChangeRequest request) {
         service.changePassword(request.currentPassword(), request.newPassword());
+    }
+
+    public record LoginRequest(@NotBlank String login, @NotNull String password) {
+        @Override
+        public String toString() { return "LoginRequest[redacted]"; }
+    }
+
+    public record PasswordChangeRequest(@NotNull String currentPassword, @NotNull String newPassword) {
+        @Override
+        public String toString() { return "PasswordChangeRequest[redacted]"; }
+    }
+
+    public record TokenResponse(String accessToken, String tokenType, long expiresIn, UserResponse user) {
+        @Override
+        public String toString() { return "TokenResponse[redacted]"; }
     }
 }

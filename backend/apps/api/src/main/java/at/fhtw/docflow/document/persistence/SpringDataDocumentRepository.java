@@ -9,6 +9,5 @@ public interface SpringDataDocumentRepository extends JpaRepository<DocumentEnti
 
     List<DocumentEntity> findAllByOwnerId(Long ownerId);
     Optional<DocumentEntity> findByIdAndOwnerId(Long id, Long ownerId);
-    boolean existsByIdAndOwnerId(Long id, Long ownerId);
-    void deleteByIdAndOwnerId(Long id, Long ownerId);
+    long deleteByIdAndOwnerId(Long id, Long ownerId);
 }

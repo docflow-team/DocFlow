@@ -1,6 +1,5 @@
 package at.fhtw.docflow.api;
 
-import at.fhtw.docflow.api.HealthResponse;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,4 +11,6 @@ public class HealthController {
     public HealthResponse health() {
         return new HealthResponse("UP", "DocFlow REST Server is running!");
     }
+
+    public record HealthResponse(String status, String message) { }
 }

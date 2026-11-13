@@ -28,10 +28,6 @@ class BackendApplicationTests {
 
 
 	@Test
-	void contextLoads() {
-	}
-
-	@Test
 	void adaptersPreserveAssignmentsAndSharedTypesAcrossTransactions(
 			@Autowired DocumentService documents, @Autowired DocumentTypeService types) {
 		Document document = documents.createDocument(Document.create("layering.pdf", "application/pdf", "Original"));
@@ -51,6 +47,7 @@ class BackendApplicationTests {
 		assertEquals(Set.of(type.id()), documents.getDocumentById(document.getId()).orElseThrow().getDocumentTypeIds());
 		assertEquals(1, documents.getAllDocuments().size());
 		assertTrue(documents.deleteDocument(document.getId()));
+		assertFalse(documents.deleteDocument(document.getId()));
 		assertTrue(documents.getDocumentById(document.getId()).isEmpty());
 		assertEquals(type, types.findAll().getFirst());
 	}

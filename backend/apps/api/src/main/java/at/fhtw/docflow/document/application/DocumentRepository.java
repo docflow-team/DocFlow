@@ -13,7 +13,5 @@ public interface DocumentRepository {
 
     Optional<Document> findByIdAndOwnerId(Long id, Long ownerId);
 
-    boolean existsByIdAndOwnerId(Long id, Long ownerId);
-
-    void deleteByIdAndOwnerId(Long id, Long ownerId);
+    boolean deleteByIdAndOwnerId(Long id, Long ownerId);
 }

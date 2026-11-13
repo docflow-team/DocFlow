@@ -1,6 +1,8 @@
 package at.fhtw.docflow.document.api;
 
 import at.fhtw.docflow.configuration.MappingConfig;
+import at.fhtw.docflow.document.api.DocumentController.DocumentRequest;
+import at.fhtw.docflow.document.api.DocumentController.DocumentResponse;
 import at.fhtw.docflow.document.domain.Document;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

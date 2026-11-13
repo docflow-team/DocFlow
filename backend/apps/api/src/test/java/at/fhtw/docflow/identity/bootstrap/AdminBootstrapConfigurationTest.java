@@ -1,5 +1,6 @@
 package at.fhtw.docflow.identity.bootstrap;
 
+import at.fhtw.docflow.identity.bootstrap.AdminBootstrapConfiguration.BootstrapAdminProperties;
 import at.fhtw.docflow.identity.application.DefaultAdminBootstrapService;
 import at.fhtw.docflow.identity.application.PasswordHasher;
 import at.fhtw.docflow.identity.application.UserRepository;

@@ -2,8 +2,8 @@ package at.fhtw.docflow.api;
 
 import java.util.NoSuchElementException;
 import java.util.Map;
-import at.fhtw.docflow.identity.application.InvalidLoginException;
-import at.fhtw.docflow.identity.application.InvalidPasswordException;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidLoginException;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidPasswordException;
 import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
 
 import org.slf4j.Logger;

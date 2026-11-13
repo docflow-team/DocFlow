@@ -2,6 +2,13 @@
 
 Guidelines for implementing the DocFlow React frontend (web UI + installable PWA). Follow these rules when changing code in this directory. The authoritative design is `../docs/architecture.md`.
 
+## Simplicity and Reuse
+
+- Keep this student coursework implementation straightforward and understandable to every teammate. Add abstractions, dependencies or configuration only for a concrete requirement or demonstrated need.
+- Reuse existing components, hooks, API functions and test fixtures before adding alternatives. Avoid duplicate state, validation and error handling within the frontend; retain client validation and server authorization checks at their respective boundaries.
+- Reduce file count where responsibilities belong together. Keep private helpers, components and UI types with their consumer when clearer; preserve the documented API/feature boundaries and keep unrelated responsibilities separate.
+- Before handoff, review changes for unnecessary code, repeated documentation and redundant tests. Remove duplication while preserving accessibility, authentication, validation and meaningful coverage of distinct behavior.
+
 ## Project Goals
 
 - Build the DocFlow web UI: login, document dashboard/list, upload, detail view, metadata/tag editing, full-text + fuzzy search, classification review, and admin screens for users and the category taxonomy.

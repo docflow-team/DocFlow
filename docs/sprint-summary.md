@@ -1,434 +1,61 @@
-# DocFlow — Sprint summary
+# DocFlow sprint summary
 
 **Course:** SWEN3 / BIF5
 
 **Updated:** 13 November 2026
 
-**Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature. Sprint 2 has moved the application into a Maven API module and separated its HTTP, business and persistence boundaries using MapStruct, without changing its HTTP behavior.
-
-User persistence, password hashing and explicit first-admin bootstrap are now implemented. Login/current-user/logout/password-change endpoints, admin-only account creation and owner-scoped metadata operations are implemented. Normal API startup uses `ddl-auto=update` in the `api` schema, retaining existing rows across restarts.
-
-## Sprint goal
-
-Sprint 2 targets the local React/Nginx workflow for login and owner-only PDF management, including tags and manual categories. Account creation is API-only; administration screens, taxonomy lifecycle/approval metadata and hosting investigation are deferred. See the [architecture](architecture.md#sprint-2-contract-decisions) for the revised scope. These features remain planned unless listed as implemented below.
-
-Sprint 1 established DocFlow as a Spring Boot REST application. The current application manages document metadata in PostgreSQL and exposes the required health and document CRUD endpoints.
-
-The implementation is a backend foundation, not yet a complete document management system. It stores metadata only; no PDF bytes are uploaded or stored.
-
-## Implemented functionality
-
-### Required document API
-
-- Create a document metadata record
-- List the authenticated user's document metadata records
-- Retrieve one document by ID
-- Replace the editable metadata of an existing document
-- Delete an existing document
-- Return **404 Not Found** when a requested document does not exist
-- Generate the database ID and creation timestamp automatically
-- Validate the document request before it reaches the service
-
-A document currently contains:
-
-| Field | Description |
-| --- | --- |
-| id | Database-generated identifier |
-| filename | Required, non-blank, maximum 255 characters |
-| contentType | Required, non-blank, maximum 255 characters |
-| description | Optional, maximum 255 characters |
-| createdAt | Automatically generated creation timestamp |
-
-The content type is currently validated only as required text. The application does not inspect actual PDF content because the request contains JSON metadata rather than file bytes.
-
-### Document types
-
-The following additional Sprint 1 foundation is implemented:
-
-- Create a document type
-- List all document types
-- Enforce a unique document type name at database level
-- Assign an existing type to an existing document
-- Persist the many-to-many relationship in the **document_document_types** table
-
-A document can have multiple types, and a type can belong to multiple documents. Example types include Invoice, Contract, and Certificate.
-
-The assignment is persisted but is not yet included in the document response. It therefore cannot currently be read through the document GET endpoint.
-
-### Technical foundation
-
-- Java 25 and Spring Boot 4.1.1
-- Spring Web MVC for the REST API
-- Spring Data JPA and Hibernate for persistence
-- PostgreSQL 18.6 in Docker Compose
-- H2 for Spring application-context and adapter round-trip tests
-- Separate HTTP DTOs, plain Java business models and JPA entities
-- MapStruct 1.6.3 for DTO/model and entity/model boundaries, with strict unmapped-target checks
-- Application services and business repository interfaces, backed by JPA adapters
-- Service-owned transactions, read-only queries and disabled Open Session in View
-- Separate User business/JPA models, normalized unique identifiers and persisted account state
-- Boot-managed Spring Security/JWT bearer authentication and delegating bcrypt password hashing
-- Explicit non-web first-admin bootstrap with schema validation
-- Constructor injection in controllers and services
-- Jakarta Bean Validation for document requests
-- Maven Wrapper for reproducible builds
-- Multi-stage Docker image for the backend
-- GitHub Actions workflow for tests and Docker image verification
-
-## Current architecture
-
-~~~text
-HTTP request
-    -> Controller
-    -> Application service interface / implementation
-    -> Business repository interface
-    -> JPA adapter and Spring Data repository
-    -> PostgreSQL
-~~~
-
-The backend is organized as follows:
+## Delivered functionality
 
-~~~text
-backend/
-├── pom.xml                         Maven parent; includes apps/api
-├── mvnw / mvnw.cmd                 Maven Wrapper
-└── apps/api/
-    ├── pom.xml                     Spring Boot API dependencies/build
-    └── src/main/java/at/fhtw/docflow/
-        ├── BackendApplication.java
-        ├── api/                    Health endpoint and shared error handling
-        ├── configuration/          Shared MapStruct configuration
-        ├── identity/               User domain/application/persistence, hashing and bootstrap
-        └── document/
-            ├── api/                Controllers, HTTP DTOs and DTO/model mappers
-            ├── application/        Service interfaces/implementations and repository ports
-            ├── domain/             Plain Java Document and DocumentType models
-            └── persistence/        Entities, entity/model mappers, adapters and Spring Data
-~~~
+The backend currently manages document metadata in PostgreSQL. It does not yet store PDF bytes or provide a frontend.
 
-Tests follow the same packages under `apps/api/src/test/java`. Controllers and application services exchange business models rather than JPA entities; application services no longer use HTTP request/response DTOs. Document behavior validates metadata, preserves server-controlled fields and manages assignments by type ID. Persistence adapters resolve shared JPA references and map back to detached business models within service transactions. The database tables and API payloads remain unchanged.
+- Document metadata create/list/read/update/delete, with generated IDs/timestamps and validated filename, content type and optional description.
+- Owner-only document access, including updates, deletion and type assignment. Other owners' documents return `404`, including to administrators; legacy rows without an owner are hidden.
+- Shared document types with create/list operations, database-enforced unique names and idempotent many-to-many assignments. Creating types requires ADMIN.
+- Username-or-email login, current-user lookup, password change and logout. Spring Security validates 15-minute bearer JWTs and checks current account state on every authenticated request.
+- Admin-only account creation with normalized unique identifiers, a hashed temporary password and a required first password change. Password change and logout revoke existing tokens.
+- Explicit first-admin bootstrap, which skips creation when accounts already exist. Temporary-password accounts may only change password or log out.
+- Public health endpoint, safe JSON errors and request examples in Bruno and HTTP files.
 
-## Required API contract
+The current routes and payloads are documented in [OpenAPI](../contracts/openapi.yaml); [README](../README.md#current-api) provides the quick reference. Document/type routes remain temporarily under `/api`; authentication and account creation use `/api/v1`.
 
-Default base URL: **http://localhost:8080**
+## Technical foundation
 
-| **Method** | **Route** | **Success** |
-| --- | --- | --- |
-| GET | /api/health | 200 |
-| POST | /api/documents | 201 |
-| GET | /api/documents | 200 |
-| GET | /api/documents/{id} | 200 or 404 |
-| PUT | /api/documents/{id} | 200 or 404 |
-| DELETE | /api/documents/{id} | 204 or 404 |
+Java 25, Spring Boot 4.1.1, Maven Wrapper, PostgreSQL 18.6 and a multi-stage API Docker image form the current stack. Docker Compose is the primary local environment.
 
-The controllers implement this contract directly:
+```text
+Controller -> application service interface/implementation
+           -> repository interface -> JPA adapter -> PostgreSQL
+```
 
-- POST returns **201 Created**.
-- Successful reads and updates return **200 OK**.
-- A successful delete returns **204 No Content**.
-- Read, update, and delete return **404 Not Found** for an unknown document ID.
-- Invalid document requests return **400 Bad Request**.
+HTTP DTOs, plain Java business models and JPA entities remain separate types. MapStruct maps their boundaries with strict unmapped-target checks. Endpoint-specific DTOs live with their controllers; authentication results/errors live with the service interface. Shared types retain separate files.
 
-### Additional document-type endpoints
+Services own transactions and authorization; repository queries enforce ownership. Open Session in View is disabled. Normal API startup uses `ddl-auto=update` in the `api` schema; disposable tests use `create-drop`, and bootstrap uses `validate`. The database volume retains rows across restarts. See [architecture](architecture.md) for schema limitations and design decisions.
 
-| Method | Route | Success |
-| --- | --- | --- |
-| POST | /api/document-types | 201 |
-| GET | /api/document-types | 200 |
-| POST | /api/documents/{documentId}/types/{typeId} | 200 |
+## Verification
 
-These endpoints extend the required core contract without changing its routes or status codes.
+The suite covers document behavior, validation, protected mapping fields, assignment/deletion semantics, account persistence and uniqueness, password hashing, bootstrap, JWT validation/revocation and owner isolation. Controller/service tests mock I/O; H2 tests exercise actual Spring wiring, generated mappers and persistence adapters.
 
-All response bodies, including centralized problem-detail errors, use `application/json`.
-Health returns a JSON status/message object; assignment returns the document/type IDs.
-Assigning a missing document or type returns **404 Not Found**. Successful deletion
-returns **204 No Content** with no body or content type.
+Verification on 13 November 2026: `clean verify` passed **71 tests, 0 failures, 0 errors, 0 skipped** in an isolated source copy. Cleanup removed an empty context-startup test and a test of MapStruct's generated null handling; the remaining tests still exercise application startup and protected mappings. Repeated deletion is checked in the adapter round trip.
 
-## Persistence and configuration
+The API Docker image build and Compose configuration passed. An isolated PostgreSQL/Compose deployment passed **42 HTTP checks**, including account creation, access restrictions, validation/conflicts, restart persistence, repeated deletion and preservation of shared document types. Passwords/tokens were absent from application/bootstrap logs; the disposable containers, network and volume were removed.
 
-The application uses PostgreSQL by default. The main variables are documented in **.env.example**:
+GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publishes Surefire reports and verifies the API image build. Automated PostgreSQL/MinIO integration tests and the coverage gate remain planned. Current test commands and report paths are in [README](../README.md#build-and-test).
 
-| Variable | Example/default | Purpose |
-| --- | --- | --- |
-| POSTGRES_DB | docflow | Database name |
-| POSTGRES_USER | docflow | Database user |
-| POSTGRES_PASSWORD | docflow | Local example password; change it for your environment |
-| POSTGRES_PORT | 5432 | PostgreSQL host port |
-| API_PORT | 8080 | Backend host port with Docker Compose |
-| SERVER_PORT | 8080 | Backend port when Java is started directly |
-| DOCFLOW_JWT_SECRET | None | Required random signing secret; generation commands in README |
+## Sprint 2 scope and remaining work
 
-Hibernate now uses **spring.jpa.hibernate.ddl-auto=update** and default schema **api**. Normal API startup applies supported schema changes and retains existing rows, including user accounts, in the named **postgres18_data** volume. Column renames, changed constraints and new required fields with existing rows may need explicit SQL changes or a deliberate database reset. Disposable tests retain `create-drop`; bootstrap retains `validate`. `infra/postgres/01-api-schema.sql` provisions the namespace only; the table definitions come from JPA. Existing `public`-schema records are not migrated. Changing credentials in **.env** does not change the credentials of an already initialized database volume.
+Sprint 2 targets login and owner-only PDF management through React/Nginx and local Docker Compose, including tags and manual categories. Account creation is API-only. See the [agreed contracts](architecture.md#sprint-2-contract-decisions) for scope and the [task list](sprint-2-tasks.md) for each task's purpose; task progress is tracked separately in [sprint-2-progress.md](sprint-2-progress.md).
 
-The explicit `bootstrap-admin` profile uses **validate**, starts without an HTTP server and exits after its work. It creates an enabled initial ADMIN with a temporary-password flag and token version 0 only when no account exists; repeating it preserves existing credentials. Username/email lookup is normalized, and both identifiers have separate unique constraints. Only encoded bcrypt passwords are persisted; the 72-byte limit is checked before hashing and comparison. Setup and credential input commands are in README. Authentication is provided by the versioned auth endpoints; a temporary-password account must change its password before using document operations.
+Remaining work adds MinIO storage, validated PDF upload/download/edit/delete, readable category assignments, tags, React screens, Nginx and focused integration/coverage checks. Upload will return `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
 
-## Authentication and ownership
+## Current limitations
 
-| Method | Route | Behavior |
-| --- | --- | --- |
-| POST | `/api/v1/auth/login` | Username/email and exact password; returns a 15-minute token and safe user DTO |
-| GET | `/api/v1/auth/me` | Current user after password change |
-| PUT | `/api/v1/auth/password` | Check current password, update hash, clear temporary flag and revoke tokens; 204 |
-| POST | `/api/v1/auth/logout` | Revoke all outstanding account tokens; 204 |
-| POST | `/api/v1/admin/users` | ADMIN creates an enabled account with a temporary password; 201 and Location |
+- No PDF storage/upload, MinIO connection, frontend, OCR, search, messaging or AI processing.
+- Account listing/editing/disabling/reset and administration screens are deferred; login throttling is required before hosted access.
+- Document types support create/list/additive assignment only. Assignments are not yet included in document responses, and type requests do not yet have Bean Validation constraints.
+- Document lists are unpaginated and have no guaranteed order.
+- Existing `public`-schema records are not migrated; null-owner metadata is not reassigned automatically.
+- Automated repository tests use H2; PostgreSQL verification is currently manual. Coverage enforcement is not configured yet.
 
-JWT signature/issuer/audience/expiry are validated by Spring Security. Each authenticated request reads current enabled/role/password-change/token-version state. Temporary-password accounts can only change password or log out. HTTP Basic, form login, session authentication and default logout are disabled; the API uses bearer headers and no authentication cookies.
+## Setup and demonstration
 
-Document create/list/read/update/delete/type-assignment is authenticated and owner-scoped in application/repository calls. Another owner's document returns 404 even to ADMIN; shared type creation is ADMIN-only. Existing metadata without an owner is hidden. Health remains public. The JSON metadata endpoints remain until PDF upload replaces them. OpenAPI, Bruno and HTTP examples match the implemented behavior.
-
-## Tests and continuous integration
-
-Run the complete backend verification from the backend directory:
-
-~~~bash
-./mvnw -B -ntp clean verify
-~~~
-
-Verified result on 20 October 2026: **31 tests, 0 failures, 0 errors, 0 skipped** (`mvnw.cmd -B -ntp verify`). Controller tests check JSON response media types and bodies, including validation, missing resources, malformed JSON, unsupported request media types and unexpected errors.
-
-Restructuring verification on 12 November 2026: the baseline suite passed before the move, and the parent/API reactor passed `mvnw.cmd -B -ntp clean verify` afterward with **31 tests, 0 failures, 0 errors, 0 skipped**. The executable artifact is now `backend/apps/api/target/api-0.0.1-SNAPSHOT.jar`, and CI collects reports from `backend/apps/api/target/surefire-reports/`. The `/api/...` routes, response bodies, validation and Hibernate `update` setting are unchanged.
-
-Layering verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **42 tests, 0 failures, 0 errors, 0 skipped**. New checks exercise metadata invariants without Spring, request/entity mapping of protected fields and null descriptions, conversion of shared type entities into IDs, and service protection against incoming identity/time/assignment changes. An H2 round-trip test uses the actual service proxies, adapters and generated mappers across transactions; repeated assignment remains unique, metadata updates preserve assignments, and document deletion preserves the shared type. PostgreSQL integration-test automation and the coverage gate remain pending.
-
-The image rebuilt successfully after the layering changes. An isolated Compose deployment with PostgreSQL passed **24 HTTP checks** across all nine operations, including reads and metadata updates after assignment, repeated assignment, description clearing and shared-type preservation after deletion. The temporary containers, network and database volume were removed.
-
-Account-creation verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **73 tests, 0 failures, 0 errors, 0 skipped**. Business and real Spring filter-chain/JWT/H2 tests cover USER/ADMIN creation, authorization, normalized identifiers, password hashing/limits, database uniqueness, safe responses and the new account's first password change. Account creation reuses the existing authentication service and test fixtures; database constraints provide one source of uniqueness enforcement and a safe `409` response. The Docker image build and Compose configuration passed. An isolated PostgreSQL deployment passed **40 HTTP checks**, including creation, access restrictions, validation/conflicts, owner isolation and restart persistence. Password/token log checks passed. Disposable containers, network and volume were removed; existing project data was untouched.
-
-Authentication/ownership verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **63 tests, 0 failures, 0 errors, 0 skipped**. Added isolated business and real Spring filter-chain/JWT/H2 tests cover authentication, password validation/change, temporary-password restrictions, global token revocation, disabled accounts, JWT signature/issuer/audience/expiry and owner isolation including administrators. The image build and Compose configuration passed. The final isolated PostgreSQL deployment passed **27 HTTP checks**, including bootstrap without a signing secret, hiding legacy unowned rows, role restrictions and persistence after restart. Password/token log checks passed. Disposable containers, network and volume were removed; existing project data was untouched.
-
-User foundation verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **51 tests, 0 failures, 0 errors, 0 skipped**. Added tests cover identifier normalization/uniqueness, account-state persistence, bcrypt hashing and matching without password normalization, UTF-8 byte limits, first-admin creation, safe repeat behavior and invalid bootstrap configuration without secret echoing.
-
-The user-foundation Docker image built successfully. An isolated PostgreSQL/Compose check passed **28 HTTP checks** plus database/bootstrap checks: all four mapped tables were in `api`, normal startup created no account, explicit bootstrap stored the expected normalized admin state and bcrypt hash, and repeating bootstrap preserved credentials and document data. The initial verification used the former `create` setting and demonstrated table resets; the follow-up verification for `update` is recorded below. Temporary containers, network and database volume were removed; existing project data was untouched.
-
-Schema-policy follow-up on 13 November 2026: `mvnw.cmd -B -ntp verify` passed **51 tests, 0 failures, 0 errors, 0 skipped**. The Docker image build and Compose configuration passed. A fresh isolated PostgreSQL deployment using `update` passed **30 HTTP checks**, initial schema creation and repeat-bootstrap checks. A normal API restart preserved the administrator and its password hash, document metadata, document types and assignments. Disposable containers, network and database volume were removed; existing project data was untouched.
-
-Bootstrap cleanup on 13 November 2026: removed duplicated configuration validation/normalization; the User model and password hasher own those rules. Secret redaction and repeat-bootstrap safety remain. All **51 tests** passed; the rebuilt Docker image and isolated PostgreSQL deployment passed **30 HTTP checks**, bootstrap checks and restart-persistence checks. The disposable stack and volume were removed.
-
-Container verification on 13 November 2026: Compose configuration and the restructured Docker image build passed. An isolated Compose deployment of that image with PostgreSQL passed **15 HTTP checks across all nine endpoint operations**, covering the document/type workflow, generated/protected fields, JSON success/error media types, validation/malformed JSON (`400`), missing resources (`404`), response negotiation (`406`), unsupported request media types (`415`) and empty successful deletion (`204`). The temporary containers, network and database volume were removed; existing project data was untouched.
-
-Docker Compose verification on 20 October 2026: rebuilt the backend and checked all nine endpoint operations. Every response body used `application/json`; successful deletion returned an empty **204**. Validation/malformed JSON (**400**), missing resources (**404**), unacceptable response media type (**406**) and unsupported request media type (**415**) also returned JSON. The demo document was deleted; one uniquely named verification type remains because type deletion is not implemented.
-
-The test suite covers:
-
-- Document service CRUD behavior
-- Missing-document behavior for reads, updates, and deletes
-- Document-type assignment logic
-- Document controller routes, status codes, and request validation
-- Health endpoint route, status, and response body
-- Document type service and controller
-- Plain Java document invariants and protected metadata updates
-- Generated mapping boundaries, null values and type-ID conversion
-- Complete Spring application-context startup and adapter round trip with H2
-- User persistence/uniqueness, password hashing/limits and admin bootstrap behavior
-- Authentication, token validation/revocation, temporary-password restrictions and owner isolation
-
-GitHub Actions runs **clean verify** for pull requests and pushes to **dev** or **main**. After successful tests, it also verifies the backend Docker image build. A coverage gate and PostgreSQL integration tests are not configured yet.
-
-Account creation accepts username, email, USER/ADMIN role and a temporary password through the existing authentication service. Identifier validation and normalization use the User model, and password validation/hashing use the existing hasher. The caller must be an enabled administrator with password change completed. Accounts start enabled, must change password and have token version 0; credentials and internal token state are absent from the response. Database constraints reject duplicate normalized identifiers with safe `409` errors. Bruno and the shared auth HTTP examples demonstrate creation and first login.
-
-## Known limitations
-
-- Only metadata is stored; PDF upload and file storage are not implemented.
-- MinIO or another object store is not connected.
-- Account listing, editing, disabling, password reset and administration screens remain deferred.
-- Older metadata without an owner is hidden; no automatic reassignment is provided.
-- Login throttling is deferred until hosted access.
-- Document types currently provide only create and list operations.
-- Assigned types are not included in document responses.
-- Document type requests do not yet have Bean Validation constraints.
-- Lists are not paginated and have no guaranteed order.
-- Document/type routes remain temporarily unversioned until the PDF/category features replace them. The OpenAPI snapshot now matches implemented routes.
-- Frontend, search, OCR, messaging, and AI classification are not implemented.
-
-## Usage and demonstration
-
-### Prerequisites
-
-- Docker with Docker Compose v2
-- JDK 25 when running the backend outside Docker
-- Network access during the first build to download Maven dependencies and Docker images
-
-### 1. Start the complete stack
-
-Run the commands from the repository root:
-
-~~~bash
-cp .env.example .env
-~~~
-
-Set the database password and generated `DOCFLOW_JWT_SECRET` in **.env** as described in [README](../README.md), then start the stack:
-
-~~~bash
-docker compose config --quiet
-docker compose up --detach --wait db
-docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/01-api-schema.sql'
-docker compose up --build --detach --wait
-docker compose ps
-~~~
-
-Follow the backend logs when needed:
-
-~~~bash
-docker compose logs --follow backend
-~~~
-
-### 2. Verify the health endpoint
-
-~~~bash
-BASE_URL=http://localhost:8080
-curl -i "$BASE_URL/api/health"
-~~~
-
-Expected status: **200 OK**
-
-Expected body:
-
-~~~json
-{"status":"UP","message":"DocFlow REST Server is running!"}
-~~~
-
-Bootstrap the first admin, log in, change the temporary password and log in again using the [README](../README.md#bootstrap-the-first-administrator) and [auth requests](../tests/http/auth.http). Set the resulting token locally for the protected examples below:
-
-~~~bash
-read -r -s -p 'Access token: ' ACCESS_TOKEN
-printf '\n'
-~~~
-
-### 3. Create a document
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" -X POST "$BASE_URL/api/documents" \
-  -H 'Content-Type: application/json' \
-  -d '{"filename":"invoice.pdf","contentType":"application/pdf","description":"October electricity invoice"}'
-~~~
-
-Expected status: **201 Created**
-
-The JSON response contains the generated ID. Use that value in the following commands:
-
-~~~bash
-DOCUMENT_ID=1
-~~~
-
-Replace 1 if the returned ID is different.
-
-### 4. List and retrieve documents
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE_URL/api/documents"
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE_URL/api/documents/$DOCUMENT_ID"
-~~~
-
-Both successful requests return **200 OK**.
-
-### 5. Update document metadata
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" -X PUT "$BASE_URL/api/documents/$DOCUMENT_ID" \
-  -H 'Content-Type: application/json' \
-  -d '{"filename":"invoice-october.pdf","contentType":"application/pdf","description":"Updated electricity invoice"}'
-~~~
-
-Expected status: **200 OK**
-
-### 6. Demonstrate request validation
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" -X POST "$BASE_URL/api/documents" \
-  -H 'Content-Type: application/json' \
-  -d '{"filename":"","contentType":"application/pdf","description":"Invalid example"}'
-~~~
-
-Expected status: **400 Bad Request**
-
-### 7. Create and assign a document type
-
-Create a type:
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" -X POST "$BASE_URL/api/document-types" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Invoice","description":"Invoices and payment requests"}'
-~~~
-
-Expected status: **201 Created**
-
-List the types and copy the returned ID:
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE_URL/api/document-types"
-TYPE_ID=1
-~~~
-
-Replace 1 if the returned ID is different, then assign the type:
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" -X POST "$BASE_URL/api/documents/$DOCUMENT_ID/types/$TYPE_ID"
-~~~
-
-Expected status: **200 OK** with JSON containing the assigned `documentId` and `typeId`.
-
-Because assigned types are not yet exposed in the document response, the persisted join row can be shown directly in PostgreSQL:
-
-~~~bash
-docker compose exec db sh -c \
-  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT * FROM api.document_document_types;"'
-~~~
-
-### 8. Delete the document and demonstrate 404
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" -X DELETE "$BASE_URL/api/documents/$DOCUMENT_ID"
-~~~
-
-Expected status: **204 No Content**
-
-Requesting the deleted document demonstrates the required missing-resource behavior:
-
-~~~bash
-curl -i -H "Authorization: Bearer $ACCESS_TOKEN" "$BASE_URL/api/documents/$DOCUMENT_ID"
-~~~
-
-Expected status: **404 Not Found**
-
-### 9. Stop the stack
-
-~~~bash
-docker compose down
-~~~
-
-This retains the PostgreSQL volume and existing API rows across the next normal startup. To deliberately delete all local DocFlow database data:
-
-~~~bash
-docker compose down --volumes
-~~~
-
-### Alternative: run the backend with Java
-
-Start only PostgreSQL:
-
-~~~bash
-docker compose up --detach --wait db
-~~~
-
-Load the trusted local **.env** file into the shell and start Spring Boot:
-
-~~~bash
-set -a
-source .env
-set +a
-cd backend
-./mvnw -pl apps/api spring-boot:run
-~~~
-
-The `api` schema must be provisioned before startup; README contains the current schema and first-admin setup commands.
-
-Alternatively, build and run the executable JAR:
-
-~~~bash
-cd backend
-./mvnw -B -ntp clean package
-java -jar apps/api/target/api-0.0.1-SNAPSHOT.jar
-~~~
-
-Reusable HTTP requests are also available in **tests/http/documents.http**.
+Use [README](../README.md) for cross-platform setup, signing-secret generation, first-admin bootstrap and build/test commands. Run the documented workflow with the [Bruno collection](../DocFlow-Requests/opencollection.yml) or [authentication](../tests/http/auth.http) and [document](../tests/http/documents.http) HTTP requests: bootstrap, change the temporary password, create an account, then create/read/edit/assign/delete metadata.

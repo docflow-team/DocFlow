@@ -26,7 +26,6 @@ class DocumentTypeServiceTest {
     @Test
     void createDocumentTypeShouldSaveDocumentType() {
 
-        // Arrange
         DocumentType documentType =
                 DocumentType.create("Invoice", "Invoice document");
 
@@ -35,11 +34,9 @@ class DocumentTypeServiceTest {
         when(documentTypeRepository.save(documentType))
                 .thenReturn(saved);
 
-        // Act
         DocumentType result =
                 documentTypeService.create(documentType);
 
-        // Assert
         assertEquals("Invoice", result.name());
         assertEquals("Invoice document", result.description());
         assertEquals(1L, result.id());
@@ -50,7 +47,6 @@ class DocumentTypeServiceTest {
     @Test
     void getAllDocumentTypesShouldReturnDocumentTypes() {
 
-        // Arrange
         DocumentType type1 =
                 new DocumentType(1L, "Invoice", "Invoice document");
 
@@ -60,11 +56,9 @@ class DocumentTypeServiceTest {
         when(documentTypeRepository.findAll())
                 .thenReturn(List.of(type1, type2));
 
-        // Act
         List<DocumentType> result =
                 documentTypeService.findAll();
 
-        // Assert
         assertEquals(2, result.size());
         assertEquals("Invoice", result.get(0).name());
         assertEquals("Contract", result.get(1).name());

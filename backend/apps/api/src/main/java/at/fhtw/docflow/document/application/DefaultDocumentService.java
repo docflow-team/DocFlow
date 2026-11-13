@@ -49,12 +49,7 @@ public class DefaultDocumentService implements DocumentService {
     }
 
     public boolean deleteDocument(Long id) {
-        if (!documentRepository.existsByIdAndOwnerId(id, currentUser.id())) {
-            return false;
-        }
-
-        documentRepository.deleteByIdAndOwnerId(id, currentUser.id());
-        return true;
+        return documentRepository.deleteByIdAndOwnerId(id, currentUser.id());
     }
 
     public void addDocumentType(Long documentId, Long typeId) {

@@ -4,12 +4,15 @@ import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.application.DocumentService;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -80,4 +83,13 @@ public class DocumentController {
         documentService.addDocumentType(documentId, typeId);
         return new DocumentTypeAssignmentResponse(documentId, typeId);
     }
+
+    public record DocumentRequest(@NotBlank @Size(max = 255) String filename,
+                                  @NotBlank @Size(max = 255) String contentType,
+                                  @Size(max = 255) String description) { }
+
+    public record DocumentResponse(Long id, String filename, String contentType,
+                                   String description, LocalDateTime createdAt) { }
+
+    public record DocumentTypeAssignmentResponse(Long documentId, Long typeId) { }
 }

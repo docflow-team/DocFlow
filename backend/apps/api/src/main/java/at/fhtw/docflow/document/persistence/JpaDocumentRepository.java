@@ -48,11 +48,7 @@ public class JpaDocumentRepository implements DocumentRepository {
         return documents.findByIdAndOwnerId(id, ownerId).map(mapper::toDomain);
     }
 
-    public boolean existsByIdAndOwnerId(Long id, Long ownerId) {
-        return documents.existsByIdAndOwnerId(id, ownerId);
-    }
-
-    public void deleteByIdAndOwnerId(Long id, Long ownerId) {
-        documents.deleteByIdAndOwnerId(id, ownerId);
+    public boolean deleteByIdAndOwnerId(Long id, Long ownerId) {
+        return documents.deleteByIdAndOwnerId(id, ownerId) > 0;
     }
 }

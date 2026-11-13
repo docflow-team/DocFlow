@@ -108,6 +108,8 @@ Test important business rules without starting Spring or a database. Mock I/O ra
 
 Use a shared MapStruct `@MapperConfig` for Spring-managed boundary mappers with constructor injection and `unmappedTargetPolicy = ReportingPolicy.ERROR`. Configure both the library and annotation processor. Explicitly ignore deliberately unmapped target fields with a reason; new target fields must not silently disappear. Keep business decisions in domain behavior, not mapper expressions, hooks or decorators.
 
+Keep endpoint-specific request/response records inside their controller and service-specific results/errors inside the service interface when this makes the code easier to navigate. Shared DTOs such as UserResponse retain a separate file. These are still separate types from business models and JPA entities; grouping related types does not remove the required boundaries.
+
 Use explicit edit DTOs with PUT for complete replacement of editable metadata, category details and account settings. Document which fields belong to each edit representation: required fields must be supplied, nullable fields may be explicitly cleared. IDs, ownership, processing state and audit fields are not editable. Apply validated changes through application/business behavior; do not blindly map request fields onto a JPA entity. No generic PATCH or three-state field-presence framework is planned.
 
 Test custom conversions, required/null values and protected fields. Straightforward generated field copies do not need repetitive tests that only mirror the generator.

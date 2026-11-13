@@ -8,6 +8,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.security.access.AccessDeniedException;
 import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidLoginException;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidPasswordException;
 import org.mockito.ArgumentCaptor;
 
 import java.util.Optional;

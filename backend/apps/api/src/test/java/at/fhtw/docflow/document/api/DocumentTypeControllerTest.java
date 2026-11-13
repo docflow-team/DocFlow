@@ -40,7 +40,6 @@ class DocumentTypeControllerTest {
     @Test
     void createDocumentTypeShouldReturn201() throws Exception {
 
-        // Arrange
         DocumentType response =
                 new DocumentType(
                         1L,
@@ -58,7 +57,6 @@ class DocumentTypeControllerTest {
                 }
                 """;
 
-        // Act & Assert
         mockMvc.perform(post("/api/document-types")
                         .contentType("application/json")
                         .content(json))
@@ -75,7 +73,6 @@ class DocumentTypeControllerTest {
     @Test
     void getAllDocumentTypesShouldReturn200() throws Exception {
 
-        // Arrange
         DocumentType type1 =
                 new DocumentType(
                         1L, "Invoice", "Invoice document"
@@ -89,7 +86,6 @@ class DocumentTypeControllerTest {
         when(documentTypeService.findAll())
                 .thenReturn(List.of(type1, type2));
 
-        // Act & Assert
         mockMvc.perform(get("/api/document-types"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/json"))

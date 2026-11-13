@@ -31,4 +31,8 @@ public class DocumentTypeController {
     public List<DocumentTypeResponse> findAll() {
         return service.findAll().stream().map(mapper::toResponse).toList();
     }
+
+    public record DocumentTypeRequest(String name, String description) { }
+
+    public record DocumentTypeResponse(Long id, String name, String description) { }
 }

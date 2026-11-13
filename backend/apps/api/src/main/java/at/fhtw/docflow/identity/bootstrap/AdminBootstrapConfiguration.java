@@ -4,6 +4,7 @@ import at.fhtw.docflow.identity.application.AdminBootstrapService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +12,7 @@ import org.springframework.context.annotation.Profile;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("bootstrap-admin")
-@EnableConfigurationProperties(BootstrapAdminProperties.class)
+@EnableConfigurationProperties(AdminBootstrapConfiguration.BootstrapAdminProperties.class)
 public class AdminBootstrapConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrapConfiguration.class);
@@ -26,5 +27,11 @@ public class AdminBootstrapConfiguration {
                 log.info("Admin bootstrap skipped because accounts already exist");
             }
         };
+    }
+
+    @ConfigurationProperties(prefix = "docflow.bootstrap")
+    public record BootstrapAdminProperties(String username, String email, String password) {
+        @Override
+        public String toString() { return "BootstrapAdminProperties[redacted]"; }
     }
 }

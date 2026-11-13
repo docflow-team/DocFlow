@@ -2,7 +2,6 @@ package at.fhtw.docflow.identity.application;
 
 import at.fhtw.docflow.identity.domain.User;
 import at.fhtw.docflow.identity.domain.UserRole;
-import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -54,13 +53,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
         if (!passwords.matches(currentPassword, user.passwordHash())) {
             throw new InvalidPasswordException("currentPassword", "Current password is incorrect");
         }
-        String hash;
-        try {
-            hash = passwords.hash(newPassword);
-        } catch (IllegalArgumentException exception) {
-            throw new InvalidPasswordException("newPassword", exception.getMessage());
-        }
-        users.save(user.changePassword(hash));
+        users.save(user.changePassword(hashPassword(newPassword, "newPassword")));
     }
 
     public User createUser(String username, String email, UserRole role, String temporaryPassword) {
@@ -69,12 +62,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
             throw new AccessDeniedException("Administrator access required");
         }
 
-        String hash;
-        try {
-            hash = passwords.hash(temporaryPassword);
-        } catch (IllegalArgumentException exception) {
-            throw new InvalidPasswordException("temporaryPassword", exception.getMessage());
-        }
+        String hash = hashPassword(temporaryPassword, "temporaryPassword");
         User user;
         try {
             user = User.newAccount(username, email, hash, role);
@@ -82,5 +70,13 @@ public class DefaultAuthenticationService implements AuthenticationService {
             throw new InvalidAccountException(exception.getMessage());
         }
         return users.save(user);
+    }
+
+    private String hashPassword(String password, String field) {
+        try {
+            return passwords.hash(password);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidPasswordException(field, exception.getMessage());
+        }
     }
 }
