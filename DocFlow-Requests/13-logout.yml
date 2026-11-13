@@ -1,0 +1,10 @@
+info:
+  name: Logout
+  type: http
+  seq: 13
+http:
+  method: POST
+  url: '{{baseUrl}}/api/v1/auth/logout'
+  headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}

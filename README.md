@@ -16,6 +16,18 @@ cp .env.example .env
 
 Replace the example `POSTGRES_PASSWORD` in `.env` with your own local PostgreSQL password. The example file contains no real secret, and `.env` must not be committed.
 
+Set `DOCFLOW_JWT_SECRET` in `.env` to a generated value:
+
+```bash
+# macOS/Linux
+openssl rand -hex 32
+```
+
+```powershell
+# Windows PowerShell
+$jwtBytes = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($jwtBytes); [Convert]::ToBase64String($jwtBytes)
+```
+
 ## Run with Docker Compose
 
 Run these commands from the repository root:
@@ -86,7 +98,7 @@ try {
 }
 ```
 
-Choose a password of at least 8 characters and at most 72 UTF-8 bytes. The administrator must change it at first login. Authentication endpoints are not implemented yet.
+Choose a password of at least 8 characters and at most 72 UTF-8 bytes. The administrator must change it at first login. Log in at `/api/v1/auth/login` and change the temporary password at `/api/v1/auth/password` before using document endpoints.
 
 ## Build and test
 
@@ -99,7 +111,7 @@ Run from `backend/`:
 
 The parent build includes the API module. Service/controller tests mock I/O, domain/mapping tests run without Spring, and application-context/adapter round-trip tests use H2; tests do not require Docker. Reports are written to `backend/apps/api/target/surefire-reports/`. On Windows, use `mvnw.cmd`.
 
-With PostgreSQL running and the datasource environment variables set, start the API from `backend/`:
+With PostgreSQL running and the datasource and `DOCFLOW_JWT_SECRET` environment variables set, start the API from `backend/`:
 
 ```bash
 ./mvnw -pl apps/api spring-boot:run
@@ -115,6 +127,15 @@ For direct Java startup, provision the `api` schema using the Compose command ab
 
 ## Current API
 
+Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire after 15 minutes; logout/password change revokes existing tokens. Documents belong to the logged-in user; another owner's records return `404`. Older metadata without an owner is hidden.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| POST | `/api/v1/auth/login` | `{login, password}`; username or email |
+| GET | `/api/v1/auth/me` | Current user |
+| PUT | `/api/v1/auth/password` | `{currentPassword, newPassword}`; then log in again |
+| POST | `/api/v1/auth/logout` | Revoke tokens |
+
 | Method | Route | Success |
 | --- | --- | --- |
 | GET | `/api/health` | `200` |
@@ -129,19 +150,19 @@ All response bodies use `Content-Type: application/json`, including errors. Heal
 `{"documentId":1,"typeId":1}` with the requested IDs. Successful deletion returns
 `204 No Content` with no body or content type.
 
-POST and PUT accept JSON containing required `filename` and `contentType` values and an optional `description`. Each field is limited to 255 characters.
+Document POST and PUT accept JSON containing required `filename` and `contentType` values and an optional `description`. Each field is limited to 255 characters.
 
-Runnable request examples are in [`tests/http/documents.http`](tests/http/documents.http). The planned target architecture remains documented in [`docs/architecture.md`](docs/architecture.md).
+Runnable examples are in [`tests/http/auth.http`](tests/http/auth.http) and [`tests/http/documents.http`](tests/http/documents.http). The planned target architecture remains documented in [`docs/architecture.md`](docs/architecture.md).
 
 ## Bruno collection
 
 Open `DocFlow-Requests/` in Bruno 3.0 or newer and select the **Local** environment.
 The collection uses [OpenCollection YAML](https://docs.usebruno.com/opencollection-yaml/overview)
-and contains one request per implemented endpoint operation (nine requests total).
+and contains one request per implemented endpoint operation (including authentication).
 Start the Docker Compose stack as described above, then send the endpoint requests as needed.
 Set `baseUrl`, `documentId` and `typeId` in the environment for your local data.
-The create requests also capture returned IDs automatically for subsequent calls.
-Document type names must be unique; change the example name if it already exists.
+Run Login with your local credentials first; it captures the token as a runtime variable. After changing a temporary password, log in again. Create requests capture returned IDs automatically.
+Document type creation requires ADMIN. Names must be unique; change the example name if it already exists.
 
 Requests use the current `/api/...` controller routes; the exported `contracts/openapi.yaml`
-still contains older `/api/v1` routes and the architecture describes planned features.
+documents the implemented routes; the architecture also describes planned features.

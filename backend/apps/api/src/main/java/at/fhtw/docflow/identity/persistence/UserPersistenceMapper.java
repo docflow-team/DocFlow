@@ -9,6 +9,8 @@ import org.mapstruct.MappingTarget;
 @Mapper(config = MappingConfig.class)
 public interface UserPersistenceMapper {
 
+    // Domain behavior is not a writable persistence property.
+    @Mapping(target = "changePassword", ignore = true)
     User toDomain(UserEntity entity);
 
     // Database-generated identity is not supplied by the creator.

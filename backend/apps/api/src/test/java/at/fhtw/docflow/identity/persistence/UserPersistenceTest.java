@@ -16,7 +16,8 @@ import static org.junit.jupiter.api.Assertions.*;
         "spring.datasource.url=jdbc:h2:mem:identity;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS api",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "docflow.jwt.secret=synthetic-test-key-at-least-thirty-two-bytes"
 })
 class UserPersistenceTest {
 

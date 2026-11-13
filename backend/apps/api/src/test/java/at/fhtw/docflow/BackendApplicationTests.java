@@ -16,9 +16,16 @@ import static org.junit.jupiter.api.Assertions.*;
 		"spring.datasource.url=jdbc:h2:mem:docflow;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS api",
 		"spring.datasource.username=sa",
 		"spring.datasource.password=",
-		"spring.jpa.hibernate.ddl-auto=create-drop"
+		"spring.jpa.hibernate.ddl-auto=create-drop",
+        "docflow.jwt.secret=synthetic-test-key-at-least-thirty-two-bytes"
 })
 class BackendApplicationTests {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    at.fhtw.docflow.identity.application.CurrentUser currentUser;
+
+    @org.junit.jupiter.api.BeforeEach
+    void account() { org.mockito.Mockito.when(currentUser.id()).thenReturn(1L); }
+
 
 	@Test
 	void contextLoads() {

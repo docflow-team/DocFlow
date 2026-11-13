@@ -5,5 +5,8 @@ info:
 http:
   method: POST
   url: '{{baseUrl}}/api/documents/{{documentId}}/types/{{typeId}}'
+  headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
 docs: Uses documentId and typeId from the environment or captured by the create requests. Success returns
   JSON containing documentId and typeId. Assigned types are not yet included in document responses.

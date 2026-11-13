@@ -6,6 +6,8 @@ http:
   method: POST
   url: '{{baseUrl}}/api/document-types'
   headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
   - name: Content-Type
     value: application/json
   body:

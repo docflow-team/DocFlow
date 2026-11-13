@@ -28,6 +28,14 @@ public record User(Long id, String username, String email, String passwordHash, 
         return new User(null, username, email, passwordHash, UserRole.ADMIN, true, true, 0);
     }
 
+    public User revokeTokens() {
+        return new User(id, username, email, passwordHash, role, enabled, mustChangePassword, tokenVersion + 1);
+    }
+
+    public User changePassword(String hash) {
+        return new User(id, username, email, hash, role, enabled, false, tokenVersion + 1);
+    }
+
     public static String normalizeIdentifier(String identifier) {
         return identifier == null ? null : identifier.trim().toLowerCase(Locale.ROOT);
     }

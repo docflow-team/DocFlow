@@ -15,6 +15,13 @@ public class DocumentEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Nullable only for pre-authentication metadata; owner-scoped queries hide legacy rows.
+    @Column(updatable = false)
+    private Long ownerId;
+
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+
     private String filename;
     private String contentType;
     private String description;

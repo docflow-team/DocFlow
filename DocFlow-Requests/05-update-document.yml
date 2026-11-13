@@ -6,6 +6,8 @@ http:
   method: PUT
   url: '{{baseUrl}}/api/documents/{{documentId}}'
   headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
   - name: Content-Type
     value: application/json
   body:

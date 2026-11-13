@@ -1,151 +1,286 @@
 openapi: 3.1.0
 info:
-  title: DocFlow setup API
-  description: "Metadata CRUD scaffold. PDF upload, authentication and classification\
-    \ remain to be implemented."
-  version: v1
+  title: DocFlow API
+  version: sprint-2-task-5
+  description: Authentication and owner-scoped metadata. PDF upload and category replacement
+    are not implemented yet.
 servers:
 - url: /
-tags:
-- name: Documents
-  description: Setup metadata operations; file upload is pending
+security:
+- bearerAuth: []
 paths:
-  /api/v1/documents/{id}/metadata:
-    put:
-      tags:
-      - Documents
-      summary: Replace editable metadata
-      description: filename and contentType are required. Null description clears
-        it. ID and creation time are preserved; unknown fields are rejected.
-      operationId: updateDocument
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DocumentMetadataRequest"
-        required: true
+  /api/health:
+    get:
+      summary: Public health check
       responses:
-        "404":
-          description: Document not found
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "200":
-          description: Updated metadata
+        '200':
+          description: Public health check
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DocumentResponse"
-        "400":
-          description: Invalid request
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Stored data conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "503":
-          description: Database unavailable
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-  /api/v1/documents:
-    get:
-      tags:
-      - Documents
-      summary: List metadata records
-      description: Scaffold returns an unpaginated list.
-      operationId: getAllDocuments
+                $ref: '#/components/schemas/HealthResponse'
+      security: []
+  /api/v1/auth/login:
+    post:
+      summary: Log in with username or email
       responses:
-        "400":
+        '200':
+          description: Log in with username or email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
           description: Invalid request
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Stored data conflict
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "503":
-          description: Database unavailable
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid login or token
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "200":
-          description: Metadata records
+                $ref: '#/components/schemas/ProblemDetail'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+  /api/v1/auth/me:
+    get:
+      summary: Read current account
+      responses:
+        '200':
+          description: Read current account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/auth/logout:
+    post:
+      summary: Revoke all current account tokens
+      responses:
+        '204':
+          description: Revoke all current account tokens
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      description: Also available to temporary-password accounts.
+  /api/v1/auth/password:
+    put:
+      summary: Change password and revoke tokens
+      responses:
+        '204':
+          description: Change password and revoke tokens
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      description: Also available to temporary-password accounts. Log in again after
+        success.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeRequest'
+  /api/documents:
+    post:
+      summary: Create owner-scoped metadata
+      responses:
+        '201':
+          description: Create owner-scoped metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      description: Temporary JSON endpoint until PDF storage is implemented; owner
+        is assigned server-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentRequest'
+    get:
+      summary: List own metadata
+      responses:
+        '200':
+          description: List own metadata
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/DocumentResponse"
-    post:
-      tags:
-      - Documents
-      summary: Create a metadata record
-      description: "Setup-only JSON operation: does not upload a PDF or start processing."
-      operationId: createDocument
+                  $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      description: Unpaginated until the document upload/listing feature lands. Legacy
+        records without owners are hidden.
+  /api/documents/{id}:
+    get:
+      summary: Read own metadata
+      responses:
+        '200':
+          description: Read own metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Missing or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    put:
+      summary: Replace own editable metadata
+      responses:
+        '200':
+          description: Replace own editable metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Missing or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DocumentRequest"
-        required: true
-      responses:
-        "400":
-          description: Invalid request
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Stored data conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "503":
-          description: Database unavailable
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "201":
-          description: Metadata created
-          headers:
-            Location:
-              description: Created metadata resource
-              style: simple
-              schema:
-                type: string
-                format: uri-reference
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DocumentResponse"
-  /api/v1/documents/{id}:
-    get:
-      tags:
-      - Documents
-      summary: Get document metadata
-      operationId: getDocumentById
+              $ref: '#/components/schemas/DocumentRequest'
       parameters:
       - name: id
         in: path
@@ -153,42 +288,29 @@ paths:
         schema:
           type: integer
           format: int64
-      responses:
-        "404":
-          description: Document not found
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "200":
-          description: Document metadata
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DocumentResponse"
-        "400":
-          description: Invalid request
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Stored data conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "503":
-          description: Database unavailable
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
     delete:
-      tags:
-      - Documents
-      summary: Delete a metadata record
-      operationId: deleteDocument
+      summary: Delete own metadata
+      responses:
+        '204':
+          description: Delete own metadata
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Missing or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
       parameters:
       - name: id
         in: path
@@ -196,79 +318,192 @@ paths:
         schema:
           type: integer
           format: int64
+  /api/document-types:
+    get:
+      summary: List shared document types
       responses:
-        "204":
-          description: Metadata deleted
-        "404":
-          description: Document not found
+        '200':
+          description: List shared document types
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "400":
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentTypeResponse'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+    post:
+      summary: Create shared document type (ADMIN only)
+      responses:
+        '201':
+          description: Create shared document type (ADMIN only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTypeResponse'
+        '400':
           description: Invalid request
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Stored data conflict
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "503":
-          description: Database unavailable
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid login or token
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: "#/components/schemas/ProblemDetail"
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTypeRequest'
+  /api/documents/{documentId}/types/{typeId}:
+    post:
+      summary: Assign type to own document
+      responses:
+        '200':
+          description: Assign type to own document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTypeAssignmentResponse'
+        '401':
+          description: Invalid login or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Role or temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Missing or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: typeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
-    DocumentMetadataRequest:
+    LoginRequest:
       type: object
-      additionalProperties: false
-      description: Complete editable metadata. Required fields must be supplied; null
-        description clears it.
+      properties:
+        login:
+          type: string
+          minLength: 1
+        password:
+          type: string
+      required:
+      - login
+      - password
+    PasswordChangeRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          description: At most 72 UTF-8 bytes
+      required:
+      - currentPassword
+      - newPassword
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+          - USER
+          - ADMIN
+        enabled:
+          type: boolean
+        mustChangePassword:
+          type: boolean
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum:
+          - Bearer
+        expiresIn:
+          type: integer
+          const: 900
+        user:
+          $ref: '#/components/schemas/UserResponse'
+    DocumentRequest:
+      type: object
       properties:
         filename:
           type: string
+          minLength: 1
           maxLength: 255
-          minLength: 0
         contentType:
           type: string
+          minLength: 1
           maxLength: 255
-          minLength: 0
         description:
           type:
           - string
-          - "null"
+          - 'null'
           maxLength: 255
-          minLength: 0
       required:
-      - contentType
       - filename
-    ProblemDetail:
-      type: object
-      properties:
-        type:
-          type: string
-          format: uri
-        title:
-          type: string
-        status:
-          type: integer
-          format: int32
-        detail:
-          type: string
-        instance:
-          type: string
-          format: uri
-        errors:
-          type: object
-          additionalProperties:
-            type: string
-          description: Field validation messages; present only for validation failures
+      - contentType
     DocumentResponse:
       type: object
       properties:
@@ -280,29 +515,63 @@ components:
         contentType:
           type: string
         description:
-          type: string
+          type:
+          - string
+          - 'null'
         createdAt:
           type: string
           format: date-time
-    DocumentRequest:
+    DocumentTypeRequest:
       type: object
-      additionalProperties: false
-      description: Setup-only metadata creation
       properties:
-        filename:
+        name:
           type: string
-          maxLength: 255
-          minLength: 0
-        contentType:
-          type: string
-          maxLength: 255
-          minLength: 0
         description:
           type:
           - string
-          - "null"
-          maxLength: 255
-          minLength: 0
-      required:
-      - contentType
-      - filename
+          - 'null'
+    DocumentTypeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+    DocumentTypeAssignmentResponse:
+      type: object
+      properties:
+        documentId:
+          type: integer
+          format: int64
+        typeId:
+          type: integer
+          format: int64
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string

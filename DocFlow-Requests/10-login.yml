@@ -1,0 +1,22 @@
+info:
+  name: Login
+  type: http
+  seq: 10
+http:
+  method: POST
+  url: '{{baseUrl}}/api/v1/auth/login'
+  headers:
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "login": "admin",
+        "password": "replace-locally"
+      }
+runtime:
+  scripts:
+  - type: after-response
+    code: |
+      if (res.status === 200) { bru.setVar("accessToken", res.body.accessToken); }

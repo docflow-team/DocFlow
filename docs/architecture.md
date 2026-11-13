@@ -130,6 +130,8 @@ Use repeatable fixtures and the explicit admin bootstrap command after schema cr
 
 MinIO objects, RabbitMQ messages, Elasticsearch indexes and archived XML files are not reset by Hibernate. For a deliberate database reset, the reset runbook must pause consumers and explicitly reconcile or reset the relevant demonstration state before processing resumes, so stale jobs and search hits cannot refer to deleted records. Preserve reusable input fixtures separately and restage XML when a fresh import is needed. Named volumes and `ddl-auto=update` preserve existing database rows between container runs; deleting a volume deliberately removes those rows.
 
+Existing pre-authentication metadata may have a null owner while Hibernate updates the schema. Owner-scoped repository queries exclude these rows; no automatic reassignment is performed. New API-created documents receive the authenticated user ID, and metadata mapping cannot change it.
+
 ### Persistence relationships and deletion
 
 Keep relationship ownership explicit and use join entities when a relationship carries data, such as who approved a category. DocumentTag, DocumentCategory and ClassificationSuggestion reference their document and a shared tag/category. Removing a join row or suggestion must never delete a shared category, tag, user or document. Use cascade/orphan removal only for genuinely owned children; avoid blanket `CascadeType.ALL`.
@@ -212,7 +214,7 @@ Keep the completed module structure, required layers/interfaces, MapStruct, user
 
 #### Routes and compatibility
 
-Use `/api/v1` for application endpoints and retain public `GET /api/health` for container checks. Replace temporary document/type routes as their replacements land. Update OpenAPI, Bruno and HTTP examples alongside each implemented endpoint; the existing export is stale.
+Use `/api/v1` for application endpoints and retain public `GET /api/health` for container checks. Replace temporary document/type routes as their replacements land. Update OpenAPI, Bruno and HTTP examples alongside each implemented endpoint; the export documents only currently implemented routes.
 
 | Method and path (relative to `/api/v1`) | Request / result |
 | --- | --- |
@@ -272,6 +274,7 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | Java / Spring Boot | Java 25 LTS / Boot 4.1.1 in `backend/pom.xml` |
 | Maven Wrapper | Maven 3.10.0, Wrapper 3.3.4 |
 | MapStruct | 1.6.3 library and annotation processor in `backend/apps/api/pom.xml` |
+| Spring Security / JWT | Boot-managed security and OAuth2 resource-server starters with JOSE support |
 | springdoc | Planned candidate: 3.1.1; not installed |
 | PDFBox / MinIO SDK | Planned candidates: 3.0.8 / 9.0.3; not installed |
 | OkHttp JVM | Planned candidate: 5.3.2 if required by the selected MinIO SDK; not installed |
@@ -343,11 +346,11 @@ Admins create a temporary password which is delivered directly to the intended u
 
 ### Recommended authentication transport
 
-Use a short-lived signed JWT access token (accepted default lifetime 15 minutes), issued after Spring Security authenticates the password. Use Spring Security's JWT encoder/decoder and JOSE/resource-server support at the existing managed version; no custom cryptography or extra authentication service. Validate signature, issuer, audience and expiry. This is a local login/token protocol, not a claim of implementing a complete OAuth authorization server. [Spring JWT support](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html).
+Use a short-lived signed JWT access token (accepted default lifetime 15 minutes), issued after Spring Security authenticates the password. Use Spring Security's JWT encoder/decoder and JOSE/resource-server support at the existing managed version; no custom cryptography or extra authentication service. Validate signature, issuer, audience and expiry. The API uses HS256 with an environment-supplied random signing secret of at least 32 UTF-8 bytes, issuer `docflow` and audience `docflow-api` (configurable through properties). Bootstrap does not require the signing secret. This is a local login/token protocol, not a claim of implementing a complete OAuth authorization server. [Spring JWT support](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html).
 
 For the student MVP keep the token **in memory**, send it explicitly in the Authorization header, and require login again after expiry or reload. Do not persist passwords or tokens in localStorage. This avoids adding refresh-token and cross-site-cookie complexity. The installed PWA uses the same in-memory approach; persistent login is a later feature. Read account enabled/password-change state and token version on authenticated requests; increment token version on password change, reset, disablement and logout to revoke outstanding tokens (logout is global for this simple design).
 
-Use HTTPS and exact allowed origins; do not enable credential cookies. Limit login attempts and return the same outward message for unknown login/wrong password. Disable browser HTTP Basic/form-login defaults for the bearer API; only a strictly bearer-only API can omit cookie-oriented CSRF protection. If cookie authentication is added later, revisit CSRF/SameSite/credentials together.
+Use HTTPS and exact allowed origins; do not enable credential cookies. Add login throttling before hosted access and return the same outward message for unknown login/wrong password. Disable browser HTTP Basic/form-login defaults for the bearer API; only a strictly bearer-only API can omit cookie-oriented CSRF protection. If cookie authentication is added later, revisit CSRF/SameSite/credentials together.
 
 Keep provider/infrastructure credentials on backend services. Use synthetic demo documents. Bound PDF size/pages, queue concurrency, request rates, prompt input/output and AI calls. Log IDs, stages, durations and error categories, not document content or credentials. Carry correlation IDs across HTTP/queues. Provide health reporting, failed-job visibility and authenticated retry/reindex actions.
 

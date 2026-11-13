@@ -13,7 +13,7 @@ class DocumentTest {
     @Test
     void metadataChangesPreserveIdentityTimeAndAssignmentsAndCanClearDescription() {
         LocalDateTime createdAt = LocalDateTime.of(2026, 11, 13, 12, 0);
-        Document document = new Document(1L, "original.pdf", "application/pdf", "Original", createdAt, Set.of(2L));
+        Document document = new Document(1L, "original.pdf", "application/pdf", "Original", createdAt, Set.of(2L), null);
 
         document.updateMetadata("renamed.pdf", "application/pdf", null);
 
@@ -47,7 +47,7 @@ class DocumentTest {
     @Test
     void assignmentsAreDefensivelyCopiedAndDuplicateAssignmentIsIdempotent() {
         Set<Long> source = new HashSet<>(Set.of(2L));
-        Document document = new Document(1L, "file.pdf", "application/pdf", null, null, source);
+        Document document = new Document(1L, "file.pdf", "application/pdf", null, null, source, null);
         source.clear();
 
         document.assignDocumentType(2L);
@@ -55,5 +55,14 @@ class DocumentTest {
         assertThrows(UnsupportedOperationException.class, () -> document.getDocumentTypeIds().clear());
         assertThrows(IllegalArgumentException.class, () -> document.assignDocumentType(0L));
         assertThrows(IllegalArgumentException.class, () -> document.assignDocumentType(null));
+    }
+    @Test
+    void ownerIsAssignedOnceAndPreservedByMetadataChanges() {
+        Document document = Document.create("owned.pdf", "application/pdf", null);
+        assertThrows(IllegalArgumentException.class, () -> document.assignOwner(null));
+        document.assignOwner(1L);
+        document.updateMetadata("renamed.pdf", "application/pdf", null);
+        assertThrows(IllegalArgumentException.class, () -> document.assignOwner(2L));
+        assertEquals(1L, document.getOwnerId());
     }
 }

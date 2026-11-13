@@ -1,0 +1,23 @@
+@baseUrl = http://localhost:8080
+@accessToken = paste-the-token-from-login
+
+### Login (supply local credentials; do not save real passwords or tokens in Git)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{"login":"admin","password":"replace-locally"}
+
+### Change the initial temporary password, then log in again
+PUT {{baseUrl}}/api/v1/auth/password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"currentPassword":"replace-locally","newPassword":"replace-locally-with-new-password"}
+
+### Current account (after changing the temporary password)
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Logout revokes outstanding tokens
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{accessToken}}

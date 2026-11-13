@@ -4,6 +4,8 @@ import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.domain.DocumentType;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import at.fhtw.docflow.identity.application.CurrentUser;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -24,6 +26,12 @@ class DocumentServiceTest {
 
     @Mock
     private DocumentTypeRepository documentTypeRepository;
+
+    @Mock
+    private CurrentUser currentUser;
+
+    @BeforeEach
+    void currentAccount() { when(currentUser.id()).thenReturn(1L); }
 
     @InjectMocks
     private DefaultDocumentService documentService;
@@ -62,7 +70,7 @@ class DocumentServiceTest {
 
         List<Document> documents = List.of(doc1, doc2);
 
-        when(documentRepository.findAll()).thenReturn(documents);
+        when(documentRepository.findAllByOwnerId(1L)).thenReturn(documents);
 
         // Act
         List<Document> result = documentService.getAllDocuments();
@@ -70,7 +78,7 @@ class DocumentServiceTest {
         // Assert
         assertEquals(2, result.size());
         assertEquals(documents, result);
-        verify(documentRepository).findAll();
+        verify(documentRepository).findAllByOwnerId(1L);
     }
 
     @Test
@@ -82,7 +90,7 @@ class DocumentServiceTest {
                 "rechung.pdf", "application/pdf", "Rechnung"
         );
 
-        when(documentRepository.findById(id))
+        when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.of(document));
 
         // Act
@@ -91,7 +99,7 @@ class DocumentServiceTest {
         // Assert
         assertTrue(result.isPresent());
         assertSame(document, result.get());
-        verify(documentRepository).findById(id);
+        verify(documentRepository).findByIdAndOwnerId(id, 1L);
     }
 
     @Test
@@ -100,7 +108,7 @@ class DocumentServiceTest {
         // Arrange
         Long id = 999L;
 
-        when(documentRepository.findById(id))
+        when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.empty());
 
         // Act
@@ -108,7 +116,7 @@ class DocumentServiceTest {
 
         // Assert
         assertTrue(result.isEmpty());
-        verify(documentRepository).findById(id);
+        verify(documentRepository).findByIdAndOwnerId(id, 1L);
     }
 
     @Test
@@ -125,7 +133,7 @@ class DocumentServiceTest {
                 "neu.pdf", "application/pdf", "Neue Beschreibung"
         );
 
-        when(documentRepository.findById(id))
+        when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.of(existing));
 
         when(documentRepository.save(existing))
@@ -141,7 +149,7 @@ class DocumentServiceTest {
         assertEquals("application/pdf", result.get().getContentType());
         assertEquals("Neue Beschreibung", result.get().getDescription());
 
-        verify(documentRepository).findById(id);
+        verify(documentRepository).findByIdAndOwnerId(id, 1L);
         verify(documentRepository).save(existing);
     }
 
@@ -155,7 +163,7 @@ class DocumentServiceTest {
                 "neu.pdf", "application/pdf", "Beschreibung"
         );
 
-        when(documentRepository.findById(id))
+        when(documentRepository.findByIdAndOwnerId(id, 1L))
                 .thenReturn(Optional.empty());
 
         // Act
@@ -165,17 +173,17 @@ class DocumentServiceTest {
         // Assert
         assertTrue(result.isEmpty());
 
-        verify(documentRepository).findById(id);
+        verify(documentRepository).findByIdAndOwnerId(id, 1L);
         verify(documentRepository, never()).save(any(Document.class));
     }
 
     @Test
     void updateDocumentIgnoresIncomingIdentityTimeAndAssignments() {
         var createdAt = java.time.LocalDateTime.of(2026, 11, 13, 12, 0);
-        Document existing = new Document(1L, "old.pdf", "application/pdf", "Old", createdAt, java.util.Set.of(2L));
+        Document existing = new Document(1L, "old.pdf", "application/pdf", "Old", createdAt, java.util.Set.of(2L), null);
         Document changes = new Document(99L, "new.pdf", "application/pdf", null,
-                createdAt.plusDays(1), java.util.Set.of(3L));
-        when(documentRepository.findById(1L)).thenReturn(Optional.of(existing));
+                createdAt.plusDays(1), java.util.Set.of(3L), null);
+        when(documentRepository.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(existing));
         when(documentRepository.save(existing)).thenReturn(existing);
 
         Document result = documentService.updateDocument(1L, changes).orElseThrow();
@@ -193,15 +201,15 @@ class DocumentServiceTest {
         // Arrange
         Long id = 1L;
 
-        when(documentRepository.existsById(id)).thenReturn(true);
+        when(documentRepository.existsByIdAndOwnerId(id, 1L)).thenReturn(true);
 
         // Act
         boolean result = documentService.deleteDocument(id);
 
         // Assert
         assertTrue(result);
-        verify(documentRepository).existsById(id);
-        verify(documentRepository).deleteById(id);
+        verify(documentRepository).existsByIdAndOwnerId(id, 1L);
+        verify(documentRepository).deleteByIdAndOwnerId(id, 1L);
     }
 
     @Test
@@ -210,7 +218,7 @@ class DocumentServiceTest {
         // Arrange
         Long id = 999L;
 
-        when(documentRepository.existsById(id)).thenReturn(false);
+        when(documentRepository.existsByIdAndOwnerId(id, 1L)).thenReturn(false);
 
         // Act
         boolean result = documentService.deleteDocument(id);
@@ -218,8 +226,8 @@ class DocumentServiceTest {
         // Assert
         assertFalse(result);
 
-        verify(documentRepository).existsById(id);
-        verify(documentRepository, never()).deleteById(anyLong());
+        verify(documentRepository).existsByIdAndOwnerId(id, 1L);
+        verify(documentRepository, never()).deleteByIdAndOwnerId(anyLong(), anyLong());
     }
 
     @Test
@@ -240,7 +248,7 @@ class DocumentServiceTest {
                 "Invoice document"
         );
 
-        when(documentRepository.findById(documentId))
+        when(documentRepository.findByIdAndOwnerId(documentId, 1L))
                 .thenReturn(Optional.of(document));
 
         when(documentTypeRepository.findById(typeId))
@@ -262,7 +270,7 @@ class DocumentServiceTest {
         Long documentId = 999L;
         Long typeId = 2L;
 
-        when(documentRepository.findById(documentId))
+        when(documentRepository.findByIdAndOwnerId(documentId, 1L))
                 .thenReturn(Optional.empty());
 
         // Act & Assert
@@ -288,7 +296,7 @@ class DocumentServiceTest {
                 "Stromrechnung"
         );
 
-        when(documentRepository.findById(documentId))
+        when(documentRepository.findByIdAndOwnerId(documentId, 1L))
                 .thenReturn(Optional.of(document));
 
         when(documentTypeRepository.findById(typeId))

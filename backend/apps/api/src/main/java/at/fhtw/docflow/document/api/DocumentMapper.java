@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 public interface DocumentMapper {
 
     // Requests supply metadata only; persisted identity, time and assignments are protected.
+    @Mapping(target = "ownerId", ignore = true)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "documentTypeIds", ignore = true)

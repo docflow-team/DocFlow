@@ -17,6 +17,10 @@ public class JpaUserRepository implements UserRepository {
         this.mapper = mapper;
     }
 
+    public Optional<User> findById(Long id) {
+        return users.findById(id).map(mapper::toDomain);
+    }
+
     public User save(User user) {
         UserEntity entity;
         if (user.id() == null) {

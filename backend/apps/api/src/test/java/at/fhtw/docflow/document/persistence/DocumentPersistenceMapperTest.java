@@ -31,7 +31,7 @@ class DocumentPersistenceMapperTest {
     @Test
     void newEntityMappingDoesNotCopyCallerIdentityTimeOrRelationships() {
         Document document = new Document(99L, "file.pdf", "application/pdf", null,
-                LocalDateTime.of(2026, 11, 13, 12, 0), Set.of(2L));
+                LocalDateTime.of(2026, 11, 13, 12, 0), Set.of(2L), null);
 
         DocumentEntity entity = mapper.toNewEntity(document);
 
@@ -47,14 +47,16 @@ class DocumentPersistenceMapperTest {
         ReflectionTestUtils.setField(entity, "id", 1L);
         ReflectionTestUtils.setField(entity, "createdAt", createdAt);
         entity.setDescription("Original");
+        entity.setOwnerId(7L);
         DocumentTypeEntity type = new DocumentTypeEntity();
         entity.getDocumentTypes().add(type);
         Document changes = new Document(99L, "new.pdf", "application/pdf", null,
-                createdAt.plusDays(1), Set.of(3L));
+                createdAt.plusDays(1), Set.of(3L), null);
 
         mapper.updateMetadata(changes, entity);
 
         assertEquals(1L, entity.getId());
+        assertEquals(7L, entity.getOwnerId());
         assertEquals(createdAt, entity.getCreatedAt());
         assertEquals(Set.of(type), entity.getDocumentTypes());
         assertEquals("new.pdf", entity.getFilename());

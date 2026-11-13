@@ -22,6 +22,7 @@ public interface DocumentPersistenceMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "documentTypes", ignore = true)
+    @Mapping(target = "ownerId", ignore = true)
     void updateMetadata(Document document, @MappingTarget DocumentEntity entity);
 
     default Long toTypeId(DocumentTypeEntity entity) {

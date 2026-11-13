@@ -9,11 +9,11 @@ public interface DocumentRepository {
 
     Document save(Document document);
 
-    List<Document> findAll();
+    List<Document> findAllByOwnerId(Long ownerId);
 
-    Optional<Document> findById(Long id);
+    Optional<Document> findByIdAndOwnerId(Long id, Long ownerId);
 
-    boolean existsById(Long id);
+    boolean existsByIdAndOwnerId(Long id, Long ownerId);
 
-    void deleteById(Long id);
+    void deleteByIdAndOwnerId(Long id, Long ownerId);
 }
