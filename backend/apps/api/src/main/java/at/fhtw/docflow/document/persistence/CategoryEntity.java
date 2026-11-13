@@ -3,9 +3,9 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "document_types")
-public class DocumentTypeEntity {
+public class CategoryEntity {
 
-    protected DocumentTypeEntity() {
+    protected CategoryEntity() {
 
     }
 

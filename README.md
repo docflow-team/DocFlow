@@ -149,6 +149,8 @@ Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire 
 | PUT | `/api/v1/documents/{id}/metadata` | `200`; replace `{title, description}` |
 | GET | `/api/v1/documents/{id}/content` | `200`; PDF attachment |
 | GET | `/api/v1/documents/{id}/processing` | `200`; inactive `NOT_STARTED` stages |
+| GET | `/api/v1/categories` | `200`; name-sorted shared categories |
+| PUT | `/api/v1/documents/{id}/categories` | `200`; replace `{categoryIds: [...]}` |
 | DELETE | `/api/v1/documents/{id}` | `204`; no body |
 
 PDFs must be parseable, unencrypted, nonempty, at most 10 MiB and contain 1-50 pages. Total multipart requests are limited to 12 MiB. Titles are trimmed and required; title/description are limited to 255 characters. Upload returns the document and processing URL; background processing is unavailable. Original files are immutable. Responses and errors use JSON, except successful PDF downloads and empty deletions. See [OpenAPI](contracts/openapi.yaml) for the full contract.
@@ -161,9 +163,9 @@ Open `DocFlow-Requests/` in Bruno 3.0 or newer and select the **Local** environm
 The collection uses [OpenCollection YAML](https://docs.usebruno.com/opencollection-yaml/overview)
 and contains one request per implemented endpoint operation (including authentication).
 Start the Docker Compose stack as described above, then send the endpoint requests as needed.
-Set `baseUrl`, `documentId` and `typeId` in the environment for your local data.
+Set `baseUrl`, `documentId` and `categoryId` in the environment for your local data.
 Run Login with your local credentials first; it captures the token as a runtime variable. After changing a temporary password, log in again. Upload and create requests capture returned IDs automatically. The upload example uses [sample.pdf](tests/fixtures/sample.pdf); select your own PDF if needed.
-Document type creation requires ADMIN. Names must be unique; change the example name if it already exists.
+Categories are seeded at startup. Choose IDs from List categories; replacing assignments accepts an empty array to clear them.
 
 Requests use the current `/api/...` controller routes; the exported `contracts/openapi.yaml`
 documents the implemented routes; the architecture also describes planned features.

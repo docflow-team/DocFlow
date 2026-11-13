@@ -4,5 +4,5 @@ variables:
   value: http://localhost:8080
 - name: documentId
   value: '1'
-- name: typeId
+- name: categoryId
   value: '1'

@@ -5,6 +5,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Positive;
+import at.fhtw.docflow.document.api.CategoryController.CategoryResponse;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 
+@Profile("!bootstrap-admin")
 @RestController
 @RequestMapping(value = "/api/v1/documents", produces = MediaType.APPLICATION_JSON_VALUE)
 public class DocumentController {
@@ -75,10 +79,9 @@ public class DocumentController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{documentId}/types/{typeId}")
-    public DocumentTypeAssignmentResponse addDocumentType(@PathVariable Long documentId, @PathVariable Long typeId) {
-        documents.addDocumentType(documentId, typeId);
-        return new DocumentTypeAssignmentResponse(documentId, typeId);
+    @PutMapping(value = "/{id}/categories", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public DocumentResponse replaceCategories(@PathVariable Long id, @Valid @RequestBody CategoriesRequest request) {
+        return mapper.toResponse(documents.replaceCategories(id, request.categoryIds()));
     }
 
     private static ProcessingResponse notStarted(Long id) {
@@ -89,11 +92,11 @@ public class DocumentController {
                                 @Size(max = 255) String description) { }
     public record MetadataRequest(@NotBlank String title, @Size(max = 255) String description) { }
     public record DocumentResponse(Long id, String title, String description, String originalFilename,
-                                   String contentType, long sizeBytes, Instant createdAt, Instant updatedAt) { }
+                                   String contentType, long sizeBytes, Instant createdAt, Instant updatedAt, List<CategoryResponse> categories) { }
     public record UploadResponse(DocumentResponse document, String processingUrl, ProcessingResponse processing) { }
     public record ProcessingResponse(Long documentId, boolean processingAvailable, String ocr, String indexing,
                                      String summary, String classification) { }
     public record DocumentPageResponse(List<DocumentResponse> items, int page, int size,
                                        long totalElements, int totalPages) { }
-    public record DocumentTypeAssignmentResponse(Long documentId, Long typeId) { }
+    public record CategoriesRequest(@NotNull List<@NotNull @Positive Long> categoryIds) { }
 }

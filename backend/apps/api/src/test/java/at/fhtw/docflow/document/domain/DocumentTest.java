@@ -3,6 +3,7 @@ package at.fhtw.docflow.document.domain;
 import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
 import static at.fhtw.docflow.document.DocumentTestFixtures.document;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -10,7 +11,7 @@ class DocumentTest {
     @Test
     void metadataChangesPreserveOwnershipFileIdentityTimesAndAssignments() {
         Document document = document(1, 7);
-        document.assignDocumentType(2L);
+        document.replaceCategories(List.of(new Category(2L, "Invoice", null)));
         var created = document.getCreatedAt();
         document.updateMetadata(new Document.Metadata(" Renamed ", null));
         assertEquals("Renamed", document.getTitle());
@@ -21,7 +22,7 @@ class DocumentTest {
         assertEquals("documents/1.pdf", document.getObjectKey());
         assertEquals(512, document.getSizeBytes());
         assertEquals(created, document.getCreatedAt());
-        assertEquals(Set.of(2L), document.getDocumentTypeIds());
+        assertEquals(List.of(new Category(2L, "Invoice", null)), document.getCategories());
     }
 
     @Test
@@ -47,14 +48,16 @@ class DocumentTest {
     }
 
     @Test
-    void assignmentsAreCopiedAndRepeatedAssignmentIsIdempotent() {
-        var source = new HashSet<>(Set.of(2L));
+    void assignmentsAreCopiedSortedAndCanBeReplacedOrCleared() {
+        var source = new HashSet<>(Set.of(new Category(2L, "Invoice", null)));
         var document = new Document(1L, 1L, new Document.Metadata("File", null), "file.pdf",
                 "documents/file.pdf", 1, null, null, source);
         source.clear();
-        document.assignDocumentType(2L);
-        assertEquals(Set.of(2L), document.getDocumentTypeIds());
-        assertThrows(UnsupportedOperationException.class, () -> document.getDocumentTypeIds().clear());
-        assertThrows(Document.InvalidDocumentException.class, () -> document.assignDocumentType(0L));
+        assertEquals(List.of(new Category(2L, "Invoice", null)), document.getCategories());
+        assertThrows(UnsupportedOperationException.class, () -> document.getCategories().clear());
+        document.replaceCategories(List.of(new Category(3L, "Report", null), new Category(1L, "Contract", null)));
+        assertEquals(List.of("Contract", "Report"), document.getCategories().stream().map(Category::name).toList());
+        document.replaceCategories(List.of());
+        assertTrue(document.getCategories().isEmpty());
     }
 }

@@ -1,0 +1,19 @@
+info:
+  name: Replace document categories
+  type: http
+  seq: 8
+http:
+  method: PUT
+  url: '{{baseUrl}}/api/v1/documents/{{documentId}}/categories'
+  headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "categoryIds": [{{categoryId}}]
+      }
+docs: Choose categoryId from List categories. Replaces all assignments and returns the updated document. Use an empty array to clear all categories.

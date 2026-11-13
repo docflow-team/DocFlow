@@ -9,6 +9,7 @@ import org.apache.pdfbox.Loader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -16,21 +17,24 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Set;
+import java.util.List;
+import java.util.HashSet;
 
+@Profile("!bootstrap-admin")
 @Service
 public class DefaultDocumentService implements DocumentService {
     private static final Logger log = LoggerFactory.getLogger(DefaultDocumentService.class);
     private final DocumentRepository documents;
-    private final DocumentTypeRepository types;
+    private final CategoryRepository categories;
     private final DocumentStorage storage;
     private final CurrentUser currentUser;
     private final TransactionTemplate transactions;
 
-    public DefaultDocumentService(DocumentRepository documents, DocumentTypeRepository types,
+    public DefaultDocumentService(DocumentRepository documents, CategoryRepository categories,
                                   DocumentStorage storage, CurrentUser currentUser,
                                   PlatformTransactionManager transactionManager) {
         this.documents = documents;
-        this.types = types;
+        this.categories = categories;
         this.storage = storage;
         this.currentUser = currentUser;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -88,11 +92,18 @@ public class DefaultDocumentService implements DocumentService {
     }
 
     @Transactional
-    public void addDocumentType(Long documentId, Long typeId) {
+    public Document replaceCategories(Long documentId, List<Long> categoryIds) {
         Document document = getDocumentById(documentId);
-        types.findById(typeId).orElseThrow();
-        document.assignDocumentType(typeId);
-        documents.save(document);
+        if (categoryIds == null || categoryIds.stream().anyMatch(id -> id == null || id <= 0)
+                || new HashSet<>(categoryIds).size() != categoryIds.size()) {
+            throw new InvalidDocumentException("Category IDs must be positive and unique");
+        }
+        var selected = categories.findAllById(categoryIds);
+        if (selected.size() != categoryIds.size()) {
+            throw new InvalidDocumentException("Unknown category ID");
+        }
+        document.replaceCategories(selected);
+        return documents.save(document);
     }
 
     private void removeObject(Long documentId, String key) {

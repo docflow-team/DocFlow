@@ -10,7 +10,7 @@ public interface DocumentService {
     Document updateMetadata(Long id, Document.Metadata metadata);
     Download download(Long id);
     void deleteDocument(Long id);
-    void addDocumentType(Long documentId, Long typeId);
+    Document replaceCategories(Long documentId, List<Long> categoryIds);
 
     record DocumentPage(List<Document> items, int page, int size, long totalElements, int totalPages) { }
     record Download(String originalFilename, byte[] content) { }

@@ -2,9 +2,9 @@ package at.fhtw.docflow;
 
 import at.fhtw.docflow.document.application.DocumentService;
 import at.fhtw.docflow.document.application.DocumentStorage;
-import at.fhtw.docflow.document.application.DocumentTypeService;
+import at.fhtw.docflow.document.application.CategoryService;
 import at.fhtw.docflow.document.domain.Document;
-import at.fhtw.docflow.document.domain.DocumentType;
+import at.fhtw.docflow.document.domain.Category;
 import at.fhtw.docflow.identity.application.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
+import java.util.List;
 import static at.fhtw.docflow.document.DocumentTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -38,11 +38,17 @@ class BackendApplicationTests {
 
     @Test
     void adaptersPreservePdfMetadataAssignmentsAndSharedTypesAcrossTransactions(
-            @Autowired DocumentService documents, @Autowired DocumentTypeService types, @Autowired JdbcTemplate jdbc) {
+            @Autowired DocumentService documents, @Autowired CategoryService categories, @Autowired JdbcTemplate jdbc) {
         byte[] content = pdf(1);
         Document first = documents.upload(new Document.Metadata("Layering", "Original"), "layering.pdf", "application/pdf", content);
         Document second = documents.upload(new Document.Metadata("Newer", null), "newer.pdf", "application/pdf", content);
-        DocumentType type = types.create(DocumentType.create("Layering test", null));
+        var labels = categories.findAll();
+        assertEquals(7, labels.size());
+        categories.seedDefaults();
+        assertEquals(labels, categories.findAll());
+        assertEquals(labels.stream().map(Category::name).sorted().toList(), labels.stream().map(Category::name).toList());
+        Category type = labels.stream().filter(label -> label.name().equals("Invoice")).findFirst().orElseThrow();
+        Category report = labels.stream().filter(label -> label.name().equals("Report")).findFirst().orElseThrow();
         assertNotNull(first.getId());
         assertNotNull(first.getCreatedAt());
         assertNotNull(first.getUpdatedAt());
@@ -50,8 +56,8 @@ class BackendApplicationTests {
         Long legacyId = jdbc.queryForObject("SELECT id FROM api.documents WHERE filename='legacy.pdf'", Long.class);
         assertThrows(NoSuchElementException.class, () -> documents.getDocumentById(legacyId));
 
-        documents.addDocumentType(first.getId(), type.id());
-        documents.addDocumentType(first.getId(), type.id());
+        documents.replaceCategories(first.getId(), List.of(type.id(), report.id()));
+        documents.replaceCategories(first.getId(), List.of(type.id(), report.id()));
         Document updated = documents.updateMetadata(first.getId(), new Document.Metadata("Renamed", null));
         assertEquals(first.getId(), updated.getId());
         assertEquals(first.getCreatedAt(), updated.getCreatedAt());
@@ -60,7 +66,14 @@ class BackendApplicationTests {
         assertEquals("layering.pdf", updated.getOriginalFilename());
         assertEquals(content.length, updated.getSizeBytes());
         assertNull(updated.getDescription());
-        assertEquals(Set.of(type.id()), documents.getDocumentById(first.getId()).getDocumentTypeIds());
+        assertEquals(List.of(type, report), documents.getDocumentById(first.getId()).getCategories());
+        assertThrows(Document.InvalidDocumentException.class, () -> documents.replaceCategories(first.getId(), List.of(type.id(), 99999L)));
+        assertEquals(List.of(type, report), documents.getDocumentById(first.getId()).getCategories());
+        documents.replaceCategories(first.getId(), List.of(report.id()));
+        assertEquals(List.of(report), documents.getDocumentById(first.getId()).getCategories());
+        documents.replaceCategories(first.getId(), List.of());
+        assertTrue(documents.getDocumentById(first.getId()).getCategories().isEmpty());
+        documents.replaceCategories(first.getId(), List.of(type.id()));
         assertArrayEquals(content, documents.download(first.getId()).content());
         var page = documents.getAllDocuments(0, 1);
         assertEquals(2, page.totalElements());
@@ -71,7 +84,7 @@ class BackendApplicationTests {
         documents.deleteDocument(first.getId());
         assertThrows(NoSuchElementException.class, () -> documents.deleteDocument(first.getId()));
         assertThrows(NoSuchElementException.class, () -> documents.getDocumentById(first.getId()));
-        assertEquals(type, types.findAll().getFirst());
+        assertEquals(labels, categories.findAll());
         documents.deleteDocument(second.getId());
         assertTrue(objects.isEmpty());
         assertEquals(0, documents.getAllDocuments(0, 20).totalElements());

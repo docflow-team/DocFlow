@@ -39,7 +39,7 @@ public class DocumentEntity {
     @JoinTable(name = "document_document_types",
             joinColumns = @JoinColumn(name = "document_id"),
             inverseJoinColumns = @JoinColumn(name = "document_type_id"))
-    private Set<DocumentTypeEntity> documentTypes = new HashSet<>();
+    private Set<CategoryEntity> categories = new HashSet<>();
 
     protected DocumentEntity() { }
     public Long getId() { return id; }
@@ -59,5 +59,5 @@ public class DocumentEntity {
     public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
-    public Set<DocumentTypeEntity> getDocumentTypes() { return documentTypes; }
+    public Set<CategoryEntity> getCategories() { return categories; }
 }

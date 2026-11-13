@@ -80,6 +80,24 @@ class DocumentControllerTest {
     }
 
     @Test
+    void categoryReplacementMapsReadableLabelsAndRequiresAnExplicitIdList() throws Exception {
+        var document = document(1, 7);
+        document.replaceCategories(List.of(new at.fhtw.docflow.document.domain.Category(42L, "Invoice", "Amount requested")));
+        when(documents.replaceCategories(1L, List.of(42L))).thenReturn(document);
+        mvc.perform(put("/api/v1/documents/1/categories").contentType("application/json")
+                        .content("{\"categoryIds\":[42],\"ownerId\":99}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.categories[0].id").value(42))
+                .andExpect(jsonPath("$.categories[0].name").value("Invoice"))
+                .andExpect(jsonPath("$.categories[0].description").value("Amount requested"));
+        verify(documents).replaceCategories(1L, List.of(42L));
+        for (String body : List.of("{}", "{\"categoryIds\":null}", "{\"categoryIds\":[null]}", "{\"categoryIds\":[0]}")) {
+            mvc.perform(put("/api/v1/documents/1/categories").contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest()).andExpect(content().contentType("application/json"));
+        }
+        verifyNoMoreInteractions(documents);
+    }
+
+    @Test
     void metadataValidationAndMalformedJsonReturnSafe400s() throws Exception {
         mvc.perform(put("/api/v1/documents/1/metadata").contentType("application/json").content("{\"title\":\"\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.title").exists());

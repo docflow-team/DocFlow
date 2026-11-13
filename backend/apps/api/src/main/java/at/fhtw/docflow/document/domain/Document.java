@@ -2,6 +2,8 @@ package at.fhtw.docflow.document.domain;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Comparator;
 import java.util.Set;
 
 public class Document {
@@ -15,11 +17,11 @@ public class Document {
     private final long sizeBytes;
     private final Instant createdAt;
     private final Instant updatedAt;
-    private final Set<Long> documentTypeIds;
+    private final Set<Category> categories;
 
     public Document(Long id, Long ownerId, Metadata metadata, String originalFilename,
                     String objectKey, long sizeBytes, Instant createdAt, Instant updatedAt,
-                    Set<Long> documentTypeIds) {
+                    Set<Category> categories) {
         if (ownerId == null || ownerId <= 0 || metadata == null || objectKey == null || objectKey.isBlank()) {
             throw new InvalidDocumentException("Document ownership, metadata and stored content are required");
         }
@@ -34,7 +36,7 @@ public class Document {
         this.sizeBytes = sizeBytes;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-        this.documentTypeIds = new HashSet<>(documentTypeIds == null ? Set.of() : documentTypeIds);
+        this.categories = new HashSet<>(categories == null ? Set.of() : categories);
     }
 
     public void updateMetadata(Metadata metadata) {
@@ -42,9 +44,9 @@ public class Document {
         this.metadata = metadata;
     }
 
-    public void assignDocumentType(Long typeId) {
-        if (typeId == null || typeId <= 0) throw new InvalidDocumentException("Document type ID must be positive");
-        documentTypeIds.add(typeId);
+    public void replaceCategories(List<Category> categories) {
+        this.categories.clear();
+        this.categories.addAll(categories);
     }
 
     public static String normalizeFilename(String filename) {
@@ -67,7 +69,7 @@ public class Document {
     public long getSizeBytes() { return sizeBytes; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
-    public Set<Long> getDocumentTypeIds() { return Set.copyOf(documentTypeIds); }
+    public List<Category> getCategories() { return categories.stream().sorted(Comparator.comparing(Category::name)).toList(); }
 
     public record Metadata(String title, String description) {
         public Metadata {

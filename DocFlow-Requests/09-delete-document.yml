@@ -8,4 +8,4 @@ http:
   headers:
   - name: Authorization
     value: Bearer {{accessToken}}
-docs: Deletes the document identified by documentId and its type assignments. Shared document types remain.
+docs: Deletes the document identified by documentId and its category assignments. Shared categories remain.

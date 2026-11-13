@@ -1,5 +1,6 @@
 @baseUrl = http://localhost:8080
 @documentId = 1
+@categoryId = 1
 @accessToken = paste-your-current-token
 
 ### Upload PDF; captures no background work (202, NOT_STARTED)
@@ -32,6 +33,17 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {"title":"Renamed invoice","description":null}
+
+### List categories; choose IDs from this response
+GET {{baseUrl}}/api/v1/categories
+Authorization: Bearer {{accessToken}}
+
+### Replace all category assignments; [] clears them
+PUT {{baseUrl}}/api/v1/documents/{{documentId}}/categories
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"categoryIds":[{{categoryId}}]}
 
 ### Download PDF
 GET {{baseUrl}}/api/v1/documents/{{documentId}}/content

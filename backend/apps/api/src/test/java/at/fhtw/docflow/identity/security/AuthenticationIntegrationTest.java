@@ -158,6 +158,13 @@ class AuthenticationIntegrationTest {
                 .andExpect(jsonPath("$.document.objectKey").doesNotExist())
                 .andExpect(jsonPath("$.document.createdAt").isString()).andReturn();
         long id = json.readTree(created.getResponse().getContentAsString()).get("document").get("id").asLong();
+        var labels = mvc.perform(get("/api/v1/categories").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn();
+        long categoryId = json.readTree(labels.getResponse().getContentAsString()).get(0).get("id").asLong();
+        mvc.perform(put("/api/v1/documents/" + id + "/categories").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(json.writeValueAsString(Map.of("categoryIds", List.of(categoryId)))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.categories[0].id").value(categoryId))
+                .andExpect(jsonPath("$.categories[0].name").isString());
         mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
         String otherToken = login(account(UserRole.ADMIN, false, true));
@@ -170,7 +177,7 @@ class AuthenticationIntegrationTest {
         mvc.perform(put("/api/v1/documents/" + id + "/metadata").header("Authorization", "Bearer " + otherToken)
                         .contentType("application/json").content("{\"title\":\"Stolen\",\"description\":null}"))
                 .andExpect(status().isNotFound());
-        mvc.perform(post("/api/v1/documents/" + id + "/types/99999").header("Authorization", "Bearer " + otherToken))
+        mvc.perform(put("/api/v1/documents/" + id + "/categories").contentType("application/json").content("{\"categoryIds\":[]}").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound());
         mvc.perform(delete("/api/v1/documents/" + id).header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound());
@@ -187,18 +194,16 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void accountStateIsReadOnEachRequestAndTypeCreationIsAdminOnly() throws Exception {
+    void accountStateIsReadOnEachRequestAndCategoryDefinitionsAreReadOnly() throws Exception {
         User user = account(UserRole.USER, false, true);
         String token = login(user);
-        mvc.perform(post("/api/document-types").header("Authorization", "Bearer " + token).contentType("application/json")
-                        .content("{\"name\":\"Forbidden type\"}"))
-                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/categories").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7));
         users.save(new User(user.id(), user.username(), user.email(), user.passwordHash(), UserRole.USER, false, false, 0));
         mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
         String admin = login(account(UserRole.ADMIN, false, true));
-        mvc.perform(post("/api/document-types").header("Authorization", "Bearer " + admin).contentType("application/json")
-                        .content(json.writeValueAsString(Map.of("name", UUID.randomUUID().toString()))))
-                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/categories").header("Authorization", "Bearer " + admin).contentType("application/json").content("{}"))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test

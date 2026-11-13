@@ -2,5 +2,5 @@ package at.fhtw.docflow.document.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface SpringDataDocumentTypeRepository extends JpaRepository<DocumentTypeEntity, Long> {
+public interface SpringDataCategoryRepository extends JpaRepository<CategoryEntity, Long> {
 }

@@ -6,6 +6,8 @@ import org.mapstruct.factory.Mappers;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 import java.util.Set;
+import java.util.List;
+import at.fhtw.docflow.document.domain.Category;
 import static at.fhtw.docflow.document.DocumentTestFixtures.document;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,14 +15,16 @@ class DocumentPersistenceMapperTest {
     private final DocumentPersistenceMapper mapper = Mappers.getMapper(DocumentPersistenceMapper.class);
 
     @Test
-    void mapsSharedTypesAndAllPdfMetadataToADetachedModel() {
+    void mapsSharedCategoriesAndAllPdfMetadataToADetachedModel() {
         DocumentEntity entity = entity();
-        var type = new DocumentTypeEntity();
+        var type = new CategoryEntity();
         ReflectionTestUtils.setField(type, "id", 2L);
-        entity.getDocumentTypes().add(type);
+        type.setName("Invoice");
+        type.setDescription("Amount requested");
+        entity.getCategories().add(type);
         Document document = mapper.toDomain(entity);
-        entity.getDocumentTypes().clear();
-        assertEquals(Set.of(2L), document.getDocumentTypeIds());
+        entity.getCategories().clear();
+        assertEquals(List.of(new Category(2L, "Invoice", "Amount requested")), document.getCategories());
         assertEquals("Original", document.getTitle());
         assertEquals("original.pdf", document.getOriginalFilename());
         assertEquals(512, document.getSizeBytes());
@@ -30,12 +34,12 @@ class DocumentPersistenceMapperTest {
     @Test
     void newEntityMappingProtectsGeneratedIdentityTimesAndRelationships() {
         Document incoming = document(99, 7);
-        incoming.assignDocumentType(2L);
+        incoming.replaceCategories(List.of(new Category(2L, "Invoice", null)));
         DocumentEntity entity = mapper.toNewEntity(incoming);
         assertNull(entity.getId());
         assertNull(entity.getCreatedAt());
         assertNull(entity.getUpdatedAt());
-        assertTrue(entity.getDocumentTypes().isEmpty());
+        assertTrue(entity.getCategories().isEmpty());
         assertEquals(7L, entity.getOwnerId());
         assertEquals("documents/99.pdf", entity.getObjectKey());
     }
@@ -47,11 +51,11 @@ class DocumentPersistenceMapperTest {
         ReflectionTestUtils.setField(entity, "id", 1L);
         ReflectionTestUtils.setField(entity, "createdAt", created);
         ReflectionTestUtils.setField(entity, "updatedAt", created);
-        var type = new DocumentTypeEntity();
-        entity.getDocumentTypes().add(type);
+        var type = new CategoryEntity();
+        entity.getCategories().add(type);
         Document changes = document(99, 8);
         changes.updateMetadata(new Document.Metadata("Renamed", null));
-        changes.assignDocumentType(3L);
+        changes.replaceCategories(List.of(new Category(3L, "Report", null)));
         mapper.updateMetadata(changes, entity);
         assertEquals(1L, entity.getId());
         assertEquals(7L, entity.getOwnerId());
@@ -60,7 +64,7 @@ class DocumentPersistenceMapperTest {
         assertEquals(512L, entity.getSizeBytes());
         assertEquals(created, entity.getCreatedAt());
         assertEquals(created, entity.getUpdatedAt());
-        assertEquals(Set.of(type), entity.getDocumentTypes());
+        assertEquals(Set.of(type), entity.getCategories());
         assertEquals("Renamed", entity.getTitle());
         assertNull(entity.getDescription());
     }

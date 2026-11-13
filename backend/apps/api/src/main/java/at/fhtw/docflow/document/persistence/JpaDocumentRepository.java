@@ -8,18 +8,19 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.NoSuchElementException;
+import at.fhtw.docflow.document.domain.Category;
 import java.util.Optional;
 
 @Repository
 public class JpaDocumentRepository implements DocumentRepository {
     private final SpringDataDocumentRepository documents;
-    private final SpringDataDocumentTypeRepository types;
+    private final SpringDataCategoryRepository categories;
     private final DocumentPersistenceMapper mapper;
 
     public JpaDocumentRepository(SpringDataDocumentRepository documents,
-                                 SpringDataDocumentTypeRepository types, DocumentPersistenceMapper mapper) {
+                                 SpringDataCategoryRepository categories, DocumentPersistenceMapper mapper) {
         this.documents = documents;
-        this.types = types;
+        this.categories = categories;
         this.mapper = mapper;
     }
 
@@ -31,12 +32,13 @@ public class JpaDocumentRepository implements DocumentRepository {
             entity = documents.findById(document.getId()).orElseThrow();
             mapper.updateMetadata(document, entity);
         }
-        List<DocumentTypeEntity> assignedTypes = types.findAllById(document.getDocumentTypeIds());
-        if (assignedTypes.size() != document.getDocumentTypeIds().size()) {
-            throw new NoSuchElementException("Document type not found");
+        var ids = document.getCategories().stream().map(Category::id).toList();
+        List<CategoryEntity> assignedCategories = categories.findAllById(ids);
+        if (assignedCategories.size() != ids.size()) {
+            throw new NoSuchElementException("Category not found");
         }
-        entity.getDocumentTypes().clear();
-        entity.getDocumentTypes().addAll(assignedTypes);
+        entity.getCategories().clear();
+        entity.getCategories().addAll(assignedCategories);
         return mapper.toDomain(documents.saveAndFlush(entity));
     }
 

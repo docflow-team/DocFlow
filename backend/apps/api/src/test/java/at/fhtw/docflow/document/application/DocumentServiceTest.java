@@ -15,16 +15,17 @@ import java.io.IOException;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import at.fhtw.docflow.document.domain.Category;
 import static at.fhtw.docflow.document.DocumentTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class DocumentServiceTest {
     private final DocumentRepository documents = mock(DocumentRepository.class);
-    private final DocumentTypeRepository types = mock(DocumentTypeRepository.class);
+    private final CategoryRepository categories = mock(CategoryRepository.class);
     private final DocumentStorage storage = mock(DocumentStorage.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
-    private final DocumentService service = new DefaultDocumentService(documents, types, storage, () -> 1L, transactions);
+    private final DocumentService service = new DefaultDocumentService(documents, categories, storage, () -> 1L, transactions);
     private final Document.Metadata metadata = new Document.Metadata("Invoice", null);
 
     @BeforeEach
@@ -102,7 +103,7 @@ class DocumentServiceTest {
     @Test
     void metadataEditsPreserveFileAndServerControlledFields() {
         Document original = document(1, 1);
-        original.assignDocumentType(2L);
+        original.replaceCategories(List.of(new Category(2L, "Invoice", null)));
         when(documents.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(original));
         when(documents.save(original)).thenReturn(original);
         Document result = service.updateMetadata(1L, new Document.Metadata("Renamed", null));
@@ -111,7 +112,7 @@ class DocumentServiceTest {
         assertEquals("documents/1.pdf", result.getObjectKey());
         assertEquals("original.pdf", result.getOriginalFilename());
         assertEquals(1L, result.getOwnerId());
-        assertTrue(result.getDocumentTypeIds().contains(2L));
+        assertEquals(2L, result.getCategories().getFirst().id());
         verifyNoInteractions(storage);
     }
 
@@ -163,13 +164,22 @@ class DocumentServiceTest {
     }
 
     @Test
-    void assignmentRequiresAnOwnedDocumentAndAnExistingType() {
+    void categoryReplacementRequiresAnOwnerAndValidUniqueKnownIds() {
         Document original = document(1, 1);
+        var invoice = new Category(2L, "Invoice", "Amount requested");
+        original.replaceCategories(List.of(invoice));
         when(documents.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(original));
-        when(types.findById(2L)).thenReturn(Optional.of(new at.fhtw.docflow.document.domain.DocumentType(2L, "Invoice", null)));
-        service.addDocumentType(1L, 2L);
-        assertTrue(original.getDocumentTypeIds().contains(2L));
-        assertThrows(NoSuchElementException.class, () -> service.addDocumentType(1L, 9L));
-        assertThrows(NoSuchElementException.class, () -> service.addDocumentType(9L, 2L));
+        when(categories.findAllById(List.of(2L))).thenReturn(List.of(invoice));
+        when(documents.save(original)).thenReturn(original);
+        assertEquals(List.of(invoice), service.replaceCategories(1L, List.of(2L)).getCategories());
+        for (List<Long> ids : List.of(List.of(2L, 2L), List.of(0L), List.of(99L))) {
+            assertThrows(InvalidDocumentException.class, () -> service.replaceCategories(1L, ids));
+            assertEquals(List.of(invoice), original.getCategories());
+        }
+        assertThrows(InvalidDocumentException.class, () -> service.replaceCategories(1L, null));
+        assertThrows(NoSuchElementException.class, () -> service.replaceCategories(9L, List.of(2L)));
+        assertTrue(service.replaceCategories(1L, List.of()).getCategories().isEmpty());
+        verify(documents, times(2)).save(original);
+        verifyNoInteractions(storage);
     }
 }
