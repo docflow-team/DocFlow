@@ -283,8 +283,9 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | springdoc | Planned candidate: 3.1.1; not installed |
 | PDFBox | 3.0.8 in `backend/apps/api/pom.xml` |
 | MinIO SDK / OkHttp JVM | 9.0.3 / 5.3.2 in `backend/apps/api/pom.xml` |
-| JaCoCo | Planned candidate: 0.8.14 with a coverage gate above 70% and an 80% target; not configured |
-| PostgreSQL | Compose: 18.6; planned disposable tests: 18.3 Alpine (not configured) |
+| JaCoCo | 0.8.14 (`backend/apps/api/pom.xml`) enforcing strictly >70% line coverage (`0.71` minimum; 80% target; excludes `*MapperImpl`) |
+| PostgreSQL | Compose: 18.6; Testcontainers `-Pintegration-tests` suite: 18.6 with `infra/postgres/01-api-schema.sql` |
+| Testcontainers | 2.0.5 (BOM-managed by Spring Boot 4.1.1) for explicit PostgreSQL/MinIO integration verification |
 | MinIO server | `RELEASE.2025-10-15T17-29-55Z`, source revision `9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a`; SHA-256 checked in `infra/minio/Dockerfile`, built with Go 1.27.4 |
 | Java images | Maven/Temurin 25 tags in `backend/Dockerfile`; not digest-pinned |
 | Frontend runtime | Node.js 24.22.3 in `frontend/.node-version`; npm lockfile committed |
@@ -392,7 +393,7 @@ GitHub Actions on PRs and pushes to `dev`/`main` should:
 5. Build images and provide a full Compose smoke-test command. Before each sprint submission, verify the complete relevant stack, including log ingestion through Logstash and visibility in Kibana. Expensive full-stack checks may run in a manual pre-release workflow; ordinary PR checks remain fast.
 6. Publish reports and verify that the submitted ZIP contains the reviewed source/configuration/fixtures and excludes secrets/caches.
 
-The backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API and MinIO Docker images. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round trips. A separate frontend workflow uses the pinned Node version and `npm ci`, then runs lint, typecheck, formatting, Vitest and the Vite production build. PostgreSQL/MinIO integration-test automation, the JaCoCo coverage gate, full-system scenarios, ZIP checks and cloud workflows remain planned.
+The backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API and MinIO Docker images. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round trips. A separate frontend workflow uses the pinned Node version and `npm ci`, then runs lint, typecheck, formatting, Vitest and the Vite production build. Ordinary backend verification (`clean verify`), explicit Docker-backed PostgreSQL/MinIO integration testing (`verify -Pintegration-tests`, optionally reusing a built MinIO image via `-Ddocflow.test.minio-image`), JaCoCo coverage enforcement (`>70%`), and API/MinIO/web image builds run in GitHub Actions with Surefire, Failsafe, and JaCoCo report artifacts. Full Sprint 3-6 processing/search scenarios, ZIP checks, and cloud workflows remain planned.
 
 ### Simple cloud deployment
 

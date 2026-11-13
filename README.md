@@ -107,14 +107,27 @@ Choose a password of at least 8 characters and at most 72 UTF-8 bytes. The admin
 
 ## Build and test
 
-Run from `backend/`:
+Run the ordinary test suite and JaCoCo coverage check (>70% line minimum) from `backend/`:
 
 ```bash
-./mvnw -B -ntp test
 ./mvnw -B -ntp clean verify
 ```
 
-The parent build includes the API module. Service/controller tests mock I/O, domain/mapping tests run without Spring, and application-context/adapter round-trip tests use H2; tests do not require Docker. Reports are written to `backend/apps/api/target/surefire-reports/`. On Windows, use `mvnw.cmd`.
+The parent build includes the API module. Service/controller tests mock I/O, domain/mapping tests run without Spring, and application-context/adapter round-trip tests use H2; ordinary tests do not require Docker.
+
+To also run the Docker-backed PostgreSQL 18.6 and source-built MinIO integration test (`RealStorageIntegrationIT`) with Docker running:
+
+```bash
+./mvnw -B -ntp clean verify -Pintegration-tests
+```
+
+Optionally reuse an already-built MinIO image instead of building `infra/minio` during the test run:
+
+```bash
+./mvnw -B -ntp verify -Pintegration-tests -Ddocflow.test.minio-image=docflow-minio:ci
+```
+
+Surefire reports are written to `backend/apps/api/target/surefire-reports/`, Failsafe integration reports to `backend/apps/api/target/failsafe-reports/`, and JaCoCo HTML/CSV/XML coverage reports to `backend/apps/api/target/site/jacoco/index.html`. On Windows, use `mvnw.cmd`.
 
 With PostgreSQL and MinIO running and the datasource, MinIO and `DOCFLOW_JWT_SECRET` environment variables set, start the API from `backend/`:
 

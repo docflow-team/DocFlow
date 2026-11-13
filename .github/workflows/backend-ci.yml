@@ -29,7 +29,26 @@ jobs:
           name: backend-test-reports
           if-no-files-found: warn
           path: backend/apps/api/target/surefire-reports/
+      - name: Publish unit coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-coverage-report
+          if-no-files-found: warn
+          path: backend/apps/api/target/site/jacoco/
       - name: Verify API Docker image build
         run: docker build --file backend/Dockerfile --tag docflow-api:ci .
       - name: Verify MinIO source image build
         run: docker build --file infra/minio/Dockerfile --tag docflow-minio:ci infra/minio
+      - name: Verify backend PostgreSQL and MinIO integration tests
+        working-directory: backend
+        run: bash mvnw -B -ntp verify -Pintegration-tests -Ddocflow.test.minio-image=docflow-minio:ci
+      - name: Publish integration and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-and-coverage-reports
+          if-no-files-found: warn
+          path: |
+            backend/apps/api/target/failsafe-reports/
+            backend/apps/api/target/site/jacoco/
