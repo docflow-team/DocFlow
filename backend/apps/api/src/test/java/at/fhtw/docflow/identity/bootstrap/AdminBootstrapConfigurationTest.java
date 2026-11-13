@@ -1,7 +1,8 @@
 package at.fhtw.docflow.identity.bootstrap;
 
-import at.fhtw.docflow.identity.application.AdminBootstrapService;
-import jakarta.validation.Validation;
+import at.fhtw.docflow.identity.application.DefaultAdminBootstrapService;
+import at.fhtw.docflow.identity.application.PasswordHasher;
+import at.fhtw.docflow.identity.application.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
 
@@ -12,16 +13,17 @@ class AdminBootstrapConfigurationTest {
 
     @Test
     void invalidConfigurationIsRejectedWithoutEchoingTheSecret() {
-        AdminBootstrapService service = mock(AdminBootstrapService.class);
-        BootstrapAdminProperties properties = new BootstrapAdminProperties("admin", "invalid", "secret");
-        try (var factory = Validation.buildDefaultValidatorFactory()) {
-            var runner = new AdminBootstrapConfiguration().adminBootstrapRunner(service, properties, factory.getValidator());
+        UserRepository users = mock(UserRepository.class);
+        PasswordHasher passwords = mock(PasswordHasher.class);
+        when(passwords.hash("synthetic-password")).thenReturn("encoded-password");
+        var service = new DefaultAdminBootstrapService(users, passwords);
+        var properties = new BootstrapAdminProperties("admin", "invalid", "synthetic-password");
+        var runner = new AdminBootstrapConfiguration().adminBootstrapRunner(service, properties);
 
-            var error = assertThrows(IllegalArgumentException.class, () -> runner.run(new DefaultApplicationArguments()));
+        var error = assertThrows(IllegalArgumentException.class, () -> runner.run(new DefaultApplicationArguments()));
 
-            assertFalse(error.getMessage().contains("secret"));
-            assertFalse(properties.toString().contains("secret"));
-            verifyNoInteractions(service);
-        }
+        assertFalse(error.getMessage().contains(properties.password()));
+        assertFalse(properties.toString().contains(properties.password()));
+        verify(users, never()).save(any());
     }
 }

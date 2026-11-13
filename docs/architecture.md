@@ -41,7 +41,7 @@ Docker Compose is the primary development and grading environment. Keep the requ
 | Sprint 4 ELK in containers | Elasticsearch, Logstash and Kibana locally and in cloud sessions |
 | Separate daily XML batch application | Access-log import, database persistence, configurable paths/schedule, archiving |
 | Docker Compose throughout | Reproducible local/grading environment |
-| Coverage >70%, mocked unit tests, integration tests | Proposed 80% application line-coverage gate plus critical-path tests |
+| Coverage >70%, mocked unit tests, integration tests | Coverage gate above 70%, 80% target and critical-path tests |
 | GitFlow, PRs, Kanban, CI/CD, documentation | GitHub branches/Actions/Projects and design/test documentation |
 
 The rubric assigns 20 points each to functionality, non-functional requirements, architecture, development workflow and code-review knowledge. Containerized deployment alone is 10 points. Document decisions, diagrams, testing, lessons learned and tracked work. Every member should understand the complete system.
@@ -184,12 +184,12 @@ Workflow: upload -> OCR -> classification -> **awaiting user review** -> user se
 | Study material | Lecture slides, assignments and study notes |
 | Report | Project, technical or inspection report |
 
-These seven labels are the accepted initial taxonomy, editable by the administrator. They can overlap: a formal tuition invoice may be both Invoice and Official correspondence. Keep definitions in the taxonomy, allow zero accepted labels (Unclassified is a UI state), and use ordinary tags for topics such as housing or employment. Start with English/German PDFs.
+These seven labels are seeded for Sprint 2; administrator editing arrives with classification in Sprint 5. They can overlap: a formal tuition invoice may be both Invoice and Official correspondence. Keep definitions in the taxonomy, allow zero accepted labels (Unclassified is a UI state), and use ordinary tags for topics such as housing or employment. Start with English/German PDFs.
 
 
 Allow only known active category IDs, validate structured output, reject malformed/duplicate/excessive suggestions and permit an unclassified result. Recheck categories when saving suggestions and confirming assignments; a category may have been deactivated while processing. Numeric model-confidence scores are unnecessary for the initial review UI. Treat document text as untrusted data; it must not authorize operations or create categories. Use distinct prompts/contracts for summary and classification.
 
-Sprint 2 completes the manual category API, assignments, business rules and mapping boundaries that were not finished in Sprint 1. Add classification suggestions, a classifier interface and fixtures with the classification feature rather than creating unused scaffolding now. Live classification, the GenAI worker and the complete review workflow arrive in Sprint 5, as confirmed by the team. Sprint 2 needs no LLM account.
+Sprint 2 completes category listing and manual assignment with simple business rules and mapping boundaries; taxonomy administration and approval metadata wait for Sprint 5. Add classification suggestions, a classifier interface and fixtures with the classification feature rather than creating unused scaffolding now. Live classification, the GenAI worker and the complete review workflow arrive in Sprint 5, as confirmed by the team. Sprint 2 needs no LLM account.
 
 ### Proposed API
 
@@ -206,78 +206,62 @@ Document permissions, pagination, upload limits, concurrency conflicts and error
 
 ### Sprint 2 contract decisions
 
-The following is the implementation target agreed for Sprint 2 on 12 November 2026, not a description of endpoints already available. The [Sprint 2 tracker](sprint-2-progress.md) records task completion. Update the exported `contracts/openapi.yaml`, Bruno collection and HTTP examples with each implemented endpoint; the existing export is stale and must not be treated as a working server contract.
+Sprint 2 is a focused local document-management increment, revised on 13 November 2026. A user can log in and manage their own PDFs through React/Nginx, including metadata, tags and manual categories. Docker Compose must run the complete workflow without cloud or AI accounts. The [Sprint 2 tracker](sprint-2-progress.md) lists the implementation checkpoints.
+
+Keep the completed module structure, required layers/interfaces, MapStruct, user persistence and explicit admin bootstrap. Add modules and dependencies only when their feature needs them. The whole-project API above includes later work; the following is the Sprint 2 subset.
 
 #### Routes and compatibility
 
-Use `/api/v1` for the Sprint 2 application API. Retain the public `GET /api/health` response and route for container checks. Replace the temporary unversioned document/type endpoints as the versioned features land; do not keep a second JSON-create endpoint or route aliases. Intermediate feature commits may retain existing routes until their replacement is implemented. Keep `main` on the complete previous sprint until a tested release PR is ready.
+Use `/api/v1` for application endpoints and retain public `GET /api/health` for container checks. Replace temporary document/type routes as their replacements land. Update OpenAPI, Bruno and HTTP examples alongside each implemented endpoint; the existing export is stale.
 
-| Method and path (relative to `/api/v1`) | Request | Successful response / access |
-| --- | --- | --- |
-| `POST /auth/login` | `{login, password}` | `200` TokenResponse; public |
-| `GET /auth/me` | None | `200` UserResponse; authenticated account with password change completed |
-| `POST /auth/logout` | None | `204`; authenticated, including temporary-password accounts |
-| `PUT /auth/password` | `{currentPassword, newPassword}` | `204`, revokes tokens; authenticated, including temporary-password accounts |
-| `POST /admin/users` | `{username, email, role, temporaryPassword}` | `201` UserResponse with Location; ADMIN |
-| `GET /admin/users` | `page`, `size` | `200` Page<UserResponse>; ADMIN |
-| `PUT /admin/users/{id}` | `{username, email, role, enabled}` | `200` UserResponse; ADMIN |
-| `POST /admin/users/{id}/reset-password` | `{temporaryPassword}` | `204`, revokes tokens and requires password change; ADMIN |
-| `POST /documents` | Multipart `file`, `title`, optional `description` | `202` UploadResponse; owner is the authenticated user |
-| `GET /documents` | `page`, `size`, optional `categoryId` | `200` Page<DocumentResponse>; own documents only |
-| `GET /documents/{id}` | None | `200` DocumentResponse; owner only |
-| `PUT /documents/{id}/metadata` | `{title, description}` | `200` DocumentResponse; owner only |
-| `DELETE /documents/{id}` | None | `204`; owner only |
-| `GET /documents/{id}/content` | None | `200` PDF attachment; owner only |
-| `GET /documents/{id}/processing` | None | `200` ProcessingResponse; owner only |
-| `GET /categories` | None | `200` CategoryResponse array, including inactive entries; authenticated |
-| `POST /categories` | `{name, description}` | `201` CategoryResponse with Location; ADMIN; initially active |
-| `PUT /categories/{id}` | `{name, description, active}` | `200` CategoryResponse; ADMIN |
-| `PUT /documents/{id}/categories` | `{categoryIds: [...]}` | `200` DocumentResponse; owner only |
-| `PUT /documents/{id}/tags` | `{tags: [...]}` | `200` DocumentResponse; owner only |
-
-There is no public registration, category deletion or global tag-management endpoint. Search, classification requests/suggestions, processing retries and reindexing belong to later sprints. Account administration grants no access to another owner's PDFs or metadata.
-
-#### DTOs and editing
-
-- IDs are positive database-generated integers represented as Java `Long`; timestamps are ISO 8601 UTC strings. JSON response properties use camelCase. Request objects reject unknown fields. Never serialize JPA entities.
-- UserResponse contains `id`, `username`, `email`, `role`, `enabled` and `mustChangePassword`. Never return password hashes or token versions. TokenResponse contains `accessToken`, `tokenType` (`Bearer`), `expiresIn` (900 seconds) and `user` (UserResponse). Login returns this user information even when a password change is required; that restricted token may only change password or log out. After changing password, the client returns to login.
-- DocumentResponse contains `id`, `title`, nullable `description`, `originalFilename`, `contentType` (`application/pdf`), `sizeBytes`, `createdAt`, `updatedAt`, `categories` (CategoryResponse array) and `tags` (string array). Do not expose MinIO keys or credentials. Return categories and tags in name order, using ID as a tie-breaker for categories.
-- CategoryResponse contains `id`, `name`, nullable `description` and `active`. `Category` replaces the existing `DocumentType` concept; it is not a second taxonomy. Use a DocumentCategory join entity with `source=MANUAL` and the approving user for Sprint 2; AI suggestions remain separate when implemented.
-- UploadResponse contains `document` (DocumentResponse), `processingUrl` (relative `/api/v1/documents/{id}/processing`) and `processing` (ProcessingResponse). Send a Location header for the created document. ProcessingResponse contains `documentId`, `processingAvailable=false` and `stages: {ocr: "NOT_STARTED", indexing: "NOT_STARTED", summary: "NOT_STARTED", classification: "NOT_STARTED"}` in Sprint 2. No request IDs or fake queued work are needed until messaging is introduced.
-- Metadata PUT supplies both `title` and `description`; `description: null` clears the description. Category create/edit supplies `name` and nullable `description`; edit also supplies `active`. Account PUT supplies all four editable properties. IDs, ownership, original file metadata, object keys, timestamps, token version and processing fields are never client-editable.
-- Category/tag PUT replaces the complete assignment set atomically, including an empty array to clear it. Validate the entire request before changing assignments. Assigning unknown or newly selected inactive categories returns `400`; existing inactive assignments may remain selected so unrelated edits do not force their removal. Duplicate category IDs are invalid. Repeating a replacement must not create duplicate joins or rewrite unchanged approval metadata. Deleting a document or removing assignments preserves shared categories, tags and users.
-- Tags are a separate free-form vocabulary. Trim and lowercase names for storage and uniqueness, discard duplicates after normalization, and return the normalized names. Resolve shared Tag rows through a repository, with DocumentTag joins; there is no cross-user document lookup or tag autocomplete in Sprint 2.
-
-#### Validation defaults
-
-These are Sprint 2 defaults, externalized where they are operational limits. Server validation is authoritative; the client mirrors field and file-size limits.
-
-| Input | Rule |
+| Method and path (relative to `/api/v1`) | Request / result |
 | --- | --- |
-| PDF file | Required, non-empty, maximum 10 MiB (10,485,760 bytes), 1-50 pages; PDFBox must open it; reject encrypted PDFs and malformed/non-PDF content rather than trusting the filename or browser MIME type |
-| Multipart body | Configure a 12 MiB total request limit to allow multipart overhead; enforce the separate 10 MiB file limit; align Nginx and Spring limits |
-| Title | Trimmed, non-blank, maximum 255 characters |
-| Description | Nullable, maximum 255 characters; omitted on upload means null |
-| Original filename | Required basename, maximum 255 characters; discard client directory components, reject control characters; metadata only, never an object key |
-| Category name | Trimmed, non-blank, maximum 255 characters; case-insensitive unique name enforced in PostgreSQL; display casing retained |
-| Category assignments | Known IDs only; no duplicates; inactive entries can only be retained from the document's current set |
-| Tags | At most 20 distinct normalized tags per document, each non-blank and at most 50 characters |
-| Username | 3-50 ASCII letters/digits, dots, underscores or hyphens; trim/lowercase for storage and login lookup; `@` is disallowed |
-| Email | Required valid email, maximum 254 characters; trim/lowercase for storage and lookup; unique independently of username |
-| Password | Minimum 8 characters, maximum 72 UTF-8 bytes, including temporary passwords; never trim or normalize |
-| Role | Exactly `USER` or `ADMIN`; role/enabled fields are admin-controlled |
+| `POST /auth/login` | `{login, password}`; returns a 15-minute bearer token and user information |
+| `GET /auth/me` | Current authenticated user |
+| `POST /auth/logout` | Revoke outstanding tokens; `204` |
+| `PUT /auth/password` | `{currentPassword, newPassword}`; revoke tokens and return to login; `204` |
+| `POST /admin/users` | ADMIN creates `{username, email, role, temporaryPassword}`; `201` |
+| `POST /documents` | Multipart `file`, `title`, optional `description`; `202` UploadResponse |
+| `GET /documents` | Paginated owner-only list |
+| `GET /documents/{id}` | Owner-only document details |
+| `PUT /documents/{id}/metadata` | Replace `{title, description}` |
+| `DELETE /documents/{id}` | Delete own document; `204` |
+| `GET /documents/{id}/content` | Download own PDF attachment |
+| `GET /documents/{id}/processing` | Read the non-active Sprint 2 processing status |
+| `GET /categories` | Read the seven seeded categories |
+| `PUT /documents/{id}/categories` | Replace own document's `{categoryIds: [...]}` |
+| `PUT /documents/{id}/tags` | Replace own document's `{tags: [...]}` |
 
-Generate MinIO keys independently of supplied filenames and keep file bytes out of PostgreSQL. Upload stores the PDF before committing metadata; failed persistence attempts object cleanup. Delete commits metadata/owned-row removal before external cleanup. Log failed cleanup with document/object IDs for manual recovery; do not claim cross-system atomicity.
+Only account creation is needed for administration in this sprint; use Bruno or HTTP examples rather than building an admin screen. Users cannot read another owner's documents, including when they are administrators. Temporary-password accounts may only change their password or log out. Keep tokens in memory; logout/expiry clears private frontend state.
 
-#### Lists, errors and conflicts
+#### Data and validation
 
-- Page<T> is an explicit JSON DTO: `{items: [...], page: 0, size: 20, totalElements: 0, totalPages: 0}`. Use zero-based `page` (minimum 0), `size` default 20, allowed range 1-100; reject invalid values with `400`. An out-of-range page returns empty items. Documents sort by `createdAt DESC, id DESC`; users by `username ASC, id ASC`. Do not expose Spring's internal Page serialization or add configurable sorting yet.
-- The document `categoryId` filter matches accepted assignments, including existing inactive ones, within the authenticated owner's documents. A well-formed unknown category ID returns an empty page. Category listing is an array sorted by name then ID, including inactive entries so clients can display existing assignments.
-- Preserve the coursework's `application/json` media type for JSON successes and problem bodies. Problem bodies contain `type` (`about:blank` initially), `title`, `status`, safe `detail` and `instance` (request path); validation failures add `errors`, an object mapping field names to readable messages. Security entry points/access-denied handlers use the same JSON shape. Do not expose rejected passwords, internal paths, SQL or stack traces.
-- Downloads use `application/pdf` and a safely encoded Content-Disposition attachment filename. A successful `204` has no body or Content-Type. JSON Accept headers are unnecessary for binary downloads; the typed client handles each endpoint's media type explicitly.
-- Return `400` for invalid fields, malformed/encrypted/over-page-limit PDFs and invalid assignment sets; `401` for invalid login/missing/expired/revoked tokens; `403` for role or temporary-password restrictions; `404` for missing/not-owned documents; `409` for duplicate account/category identifiers or last-active-admin violations; `413` for file/request size limits; `415` for unsupported request media types; `429` for login rate limiting; `503` when required storage/database access is unavailable. Keep unexpected failures as safe `500` responses. Apply file validation before storage.
-- Login uses the same outward message for unknown-user, wrong-password and disabled-account failures. Invalid current password during an authenticated password change returns a field-level `400`. Invalid tokens are rejected before evaluating resource existence.
-- Use complete PUT replacement and ordinary transactions. No ETags, optimistic-locking API or generic PATCH framework in Sprint 2; concurrent metadata/assignment edits use last successful write wins. Protect uniqueness and the last-active-admin rule transactionally; document this accepted editing limitation.
+- Keep HTTP DTOs separate from business models and JPA entities. IDs are generated positive `Long` values; timestamps use ISO 8601 UTC. Never expose password hashes, token versions or object-store keys.
+- UserResponse contains `id`, `username`, `email`, `role`, `enabled`, `mustChangePassword`. TokenResponse contains `accessToken`, `tokenType=Bearer`, `expiresIn=900`, `user`.
+- DocumentResponse contains `id`, `title`, nullable `description`, `originalFilename`, `contentType=application/pdf`, `sizeBytes`, `createdAt`, `updatedAt`, `categories`, `tags`.
+- CategoryResponse contains `id`, `name`, nullable `description`. Rename the existing DocumentType concept to Category; keep one taxonomy and simple many-to-many assignments. Add approval/source metadata and category activation rules with classification, not now.
+- Retain the user's explicit upload decision: `202 Accepted`, a Location header and UploadResponse containing `document`, `processingUrl`, `processing`. ProcessingResponse contains `documentId`, `processingAvailable=false` and four `NOT_STARTED` stages (`ocr`, `indexing`, `summary`, `classification`). No workers, polling, retries or persisted processing-request state are needed in Sprint 2.
+- Require a non-empty, parseable, unencrypted PDF, at most 10 MiB and 1-50 pages. Use PDFBox for validation. Allow 12 MiB total multipart requests and align Nginx limits. Treat the original basename as metadata only; generate storage keys server-side.
+- Title: trimmed, non-blank, at most 255 characters. Description: nullable, at most 255 characters. Original filename: basename without control characters, at most 255 characters.
+- Categories: seed the seven agreed labels once, accept known IDs only and reject duplicate IDs. Replacement may clear all assignments. Preserve shared categories/users on document deletion. No inactive-category rules or taxonomy editing in Sprint 2.
+- Tags: trim/lowercase, deduplicate, at most 20 per document and 50 characters each. Use shared Tag rows and document joins; no tag administration or autocomplete.
+- Usernames: 3-50 ASCII letters/digits/dots/underscores/hyphens; emails: valid and at most 254 characters. Normalize identifiers consistently and enforce uniqueness. Passwords: at least 8 characters and at most 72 UTF-8 bytes; never normalize them. Roles: USER or ADMIN.
+
+#### Lists, errors and storage
+
+Use a simple page DTO `{items, page, size, totalElements, totalPages}` for documents: zero-based page, default size 20, maximum 100, newest first. Categories are a name-sorted array. Category filtering can arrive with search.
+
+Use complete PUT representations and ordinary transactions. Validate a replacement before saving it; protected fields are never editable. Concurrent edits use last successful write wins. Return consistent safe JSON errors: `400` invalid input, `401` unauthenticated, `403` role/password-change restrictions, `404` missing/not owned, `409` duplicate account identifiers, `413` size limit and `415` unsupported media type. Use the same login failure message for unknown users, wrong passwords and disabled accounts. Downloads use `application/pdf`; `204` responses have no body.
+
+Store PDF bytes in MinIO and metadata in PostgreSQL. On failed metadata persistence, attempt object cleanup. Delete metadata/owned rows transactionally, then attempt object deletion. Log failed cleanup for manual recovery; no distributed transaction or cleanup framework. Preserve required layers and meaningful tests. Verify the core workflow against PostgreSQL/MinIO and enforce the course's coverage requirement above 70%; 80% remains a target.
+
+#### Deferred work
+
+- Account listing/editing/disabling/reset endpoints and administration screens: later account-management increment. Add last-active-admin protection when demotion/disabling becomes possible.
+- Taxonomy creation/editing/activation and UI, assignment approval/source metadata: classification increment (Sprint 5).
+- Search/filtering, messaging, OCR, AI, processing retries and PWA installation: their existing later sprints.
+- Hosting feasibility/deployment: a separate investigation outside Sprint 2 acceptance.
+- Login throttling: before hosted access; no rate-limiter infrastructure in the local Sprint 2 increment.
 
 ## 5. Version baseline
 
@@ -291,7 +275,7 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | springdoc | Planned candidate: 3.1.1; not installed |
 | PDFBox / MinIO SDK | Planned candidates: 3.0.8 / 9.0.3; not installed |
 | OkHttp JVM | Planned candidate: 5.3.2 if required by the selected MinIO SDK; not installed |
-| JaCoCo | Planned candidate: 0.8.14 with an 80% application line-coverage gate; not configured |
+| JaCoCo | Planned candidate: 0.8.14 with a coverage gate above 70% and an 80% target; not configured |
 | PostgreSQL | Compose: 18.6; planned disposable tests: 18.3 Alpine (not configured) |
 | MinIO server | Planned pinned source release and commit in `infra/minio/Dockerfile`; file/service not yet implemented |
 | Java images | Maven/Temurin 25 tags in `backend/Dockerfile`; not digest-pinned |
@@ -391,7 +375,7 @@ GitHub Actions on PRs and pushes to `dev`/`main` should:
 5. Build images and provide a full Compose smoke-test command. Before each sprint submission, verify the complete relevant stack, including log ingestion through Logstash and visibility in Kibana. Expensive full-stack checks may run in a manual pre-release workflow; ordinary PR checks remain fast.
 6. Publish reports and verify that the submitted ZIP contains the reviewed source/configuration/fixtures and excludes secrets/caches.
 
-The current backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API Docker image from the repository root. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round-trip tests. PostgreSQL/MinIO integration-test automation, the JaCoCo 80% gate, frontend checks, full-system scenarios, ZIP checks and cloud workflows remain planned; do not infer those deliverables from the backend CI file.
+The current backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API Docker image from the repository root. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round-trip tests. PostgreSQL/MinIO integration-test automation, the JaCoCo coverage gate, frontend checks, full-system scenarios, ZIP checks and cloud workflows remain planned; do not infer those deliverables from the backend CI file.
 
 ### Simple cloud deployment
 
@@ -418,10 +402,10 @@ These are starting responsibilities, not permanent silos. Student C's workload g
 | Sprint | Deliverable |
 | --- | --- |
 | 1 | Delivered metadata-only Java API, PostgreSQL, document types/additive assignments, manual DTO/entity mapping, tests, Compose and backend CI; storage and the complete intended layering/category foundation carried forward |
-| 2 | Complete the carried-over layers/MapStruct, PDF storage and category foundation; add accounts/owner-only access, tags, React/Nginx dashboard/detail/upload/admin screens, contract alignment, integration tests and coverage; separate managed-container hosting investigation |
+| 2 | Complete layers/MapStruct, login/basic account creation, owner-only PDF storage/CRUD, tags and seeded manual categories; React/Nginx login/upload/list/detail/edit screens, contract alignment and focused integration/coverage checks. Administration screens and hosting investigation are outside this increment |
 | 3 | RabbitMQ, direct publishing with visible failures/manual retry, empty OCR consumer, contracts, logging/errors and mid-term review |
 | 4 | Real OCR on the MinIO-stored PDFs (storage integrated in Sprint 2), separate indexing worker, Elasticsearch, Logstash and Kibana containers locally and in cloud sessions; demonstrate HelloWorld.pdf search and log visibility |
-| 5 | GenAI summary/classification, validated results, retries, review UI and installable PWA tested on a phone |
+| 5 | GenAI summary/classification, taxonomy administration/approval metadata, validated results, retries, review UI and installable PWA tested on a phone |
 | 6 | Focused end-to-end tests, long-lived scheduled XML importer, manual retry checks, deployment smoke test, final docs/ZIP/review preparation |
 
 ## 12. Moodle material references

@@ -114,13 +114,13 @@ Guidelines for implementing the DocFlow Java backend. The authoritative design i
 - Spring Security bearer JWT; username-or-email/password login, no public registration/social login. Use Spring JWT support, no custom cryptography; validate signature, issuer, audience and expiry. Keep the accepted 15-minute token lifetime.
 - Check enabled, must-change-password and token-version state; increment token version on password change/reset/disable/logout. Logout revokes outstanding tokens globally in this simple design.
 - Use DelegatingPasswordEncoder with bcrypt; reject passwords exceeding its 72-byte input limit. Temporary-password accounts may only change password or log out. Bootstrap the first admin through an explicit command/environment secrets; never commit default passwords or reset them routinely. Prevent disabling/demoting the last active admin.
-- Enforce ownership server-side; use 404 for other users' resources. Rate-limit login and use identical unknown-user/wrong-password messages. Disable form/basic-auth defaults; revisit CSRF if cookies are introduced. Use HTTPS for hosted access and exact allowed origins; local Compose retains its documented HTTP endpoint.
+- Enforce ownership server-side; use 404 for other users' resources. Use identical unknown-user/wrong-password messages. Add login throttling before hosted access. Disable form/basic-auth defaults; revisit CSRF if cookies are introduced. Use HTTPS for hosted access and exact allowed origins; local Compose retains its documented HTTP endpoint.
 - Use SLF4J/Logback, not System.out. Log IDs, stages, durations and failure categories, never secrets, file contents or personal data. Propagate correlation IDs through HTTP/queues.
 - Provide Actuator health/info and visible failures with authenticated retry/reindex operations.
 
 ## Testing
 
-- From `backend/`, run `./mvnw -B -ntp test` for database-free isolated tests and `./mvnw -B -ntp clean verify` for the complete suite, including disposable PostgreSQL Testcontainers integration tests (Docker required) and the enforced 80% application line-coverage gate. Reports are in `apps/api/target/surefire-reports`, `apps/api/target/failsafe-reports` and `apps/api/target/site/jacoco`. On Windows PowerShell use `./mvnw.cmd`.
+- From `backend/`, run `./mvnw -B -ntp test` or `./mvnw -B -ntp clean verify` for the current suite, including H2 round-trip tests. PostgreSQL/MinIO integration automation and JaCoCo are planned with their features; integration checks will require Docker. Enforce coverage above 70%, with 80% as a target. Current reports are in `apps/api/target/surefire-reports`. On Windows PowerShell use `./mvnw.cmd`.
 
 - Require >70% coverage and target 80% meaningful application line coverage with JaCoCo; keep generated-code exclusions narrow.
 - Test valid/invalid controller and business-component cases, authorization, validation, classification confirmation, custom mappings and XML parsing. Mock I/O, not the business behavior under test.

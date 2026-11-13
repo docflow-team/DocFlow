@@ -10,6 +10,8 @@ User persistence, password hashing and explicit first-admin bootstrap are now im
 
 ## Sprint goal
 
+Sprint 2 targets the local React/Nginx workflow for login and owner-only PDF management, including tags and manual categories. Account creation is API-only; administration screens, taxonomy lifecycle/approval metadata and hosting investigation are deferred. See the [architecture](architecture.md#sprint-2-contract-decisions) for the revised scope. These features remain planned unless listed as implemented below.
+
 Sprint 1 established DocFlow as a Spring Boot REST application. The current application manages document metadata in PostgreSQL and exposes the required health and document CRUD endpoints.
 
 The implementation is a backend foundation, not yet a complete document management system. It stores metadata only; no PDF bytes are uploaded or stored.
@@ -180,6 +182,8 @@ User foundation verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify
 The user-foundation Docker image built successfully. An isolated PostgreSQL/Compose check passed **28 HTTP checks** plus database/bootstrap checks: all four mapped tables were in `api`, normal startup created no account, explicit bootstrap stored the expected normalized admin state and bcrypt hash, and repeating bootstrap preserved credentials and document data. The initial verification used the former `create` setting and demonstrated table resets; the follow-up verification for `update` is recorded below. Temporary containers, network and database volume were removed; existing project data was untouched.
 
 Schema-policy follow-up on 13 November 2026: `mvnw.cmd -B -ntp verify` passed **51 tests, 0 failures, 0 errors, 0 skipped**. The Docker image build and Compose configuration passed. A fresh isolated PostgreSQL deployment using `update` passed **30 HTTP checks**, initial schema creation and repeat-bootstrap checks. A normal API restart preserved the administrator and its password hash, document metadata, document types and assignments. Disposable containers, network and database volume were removed; existing project data was untouched.
+
+Bootstrap cleanup on 13 November 2026: removed duplicated configuration validation/normalization; the User model and password hasher own those rules. Secret redaction and repeat-bootstrap safety remain. All **51 tests** passed; the rebuilt Docker image and isolated PostgreSQL deployment passed **30 HTTP checks**, bootstrap checks and restart-persistence checks. The disposable stack and volume were removed.
 
 Container verification on 13 November 2026: Compose configuration and the restructured Docker image build passed. An isolated Compose deployment of that image with PostgreSQL passed **15 HTTP checks across all nine endpoint operations**, covering the document/type workflow, generated/protected fields, JSON success/error media types, validation/malformed JSON (`400`), missing resources (`404`), response negotiation (`406`), unsupported request media types (`415`) and empty successful deletion (`204`). The temporary containers, network and database volume were removed; existing project data was untouched.
 

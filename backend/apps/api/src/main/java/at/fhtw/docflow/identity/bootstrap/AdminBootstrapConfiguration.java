@@ -1,7 +1,6 @@
 package at.fhtw.docflow.identity.bootstrap;
 
 import at.fhtw.docflow.identity.application.AdminBootstrapService;
-import jakarta.validation.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationRunner;
@@ -19,12 +18,8 @@ public class AdminBootstrapConfiguration {
 
     @Bean
     ApplicationRunner adminBootstrapRunner(AdminBootstrapService service,
-                                           BootstrapAdminProperties properties, Validator validator) {
+                                           BootstrapAdminProperties properties) {
         return args -> {
-            // Check explicitly so Spring binding errors cannot print rejected passwords.
-            if (!validator.validate(properties).isEmpty()) {
-                throw new IllegalArgumentException("Invalid bootstrap configuration; check username, email and password requirements");
-            }
             if (service.bootstrap(properties.username(), properties.email(), properties.password())) {
                 log.info("Initial administrator created; password change is required at first login");
             } else {
