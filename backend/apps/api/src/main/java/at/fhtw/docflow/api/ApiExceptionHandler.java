@@ -4,6 +4,7 @@ import java.util.NoSuchElementException;
 import java.util.Map;
 import at.fhtw.docflow.identity.application.InvalidLoginException;
 import at.fhtw.docflow.identity.application.InvalidPasswordException;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,25 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "Document or document type not found");
         return handleExceptionInternal(exception, problem, new HttpHeaders(), HttpStatus.NOT_FOUND, request);
+    }
+
+    // Database constraints enforce unique identifiers, including competing creates.
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Object> handleStoredConflict(org.springframework.dao.DataIntegrityViolationException exception, WebRequest request) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "The request conflicts with stored data");
+        return handleExceptionInternal(exception, problem, new HttpHeaders(), HttpStatus.CONFLICT, request);
+    }
+
+    @ExceptionHandler(InvalidAccountException.class)
+    public ResponseEntity<Object> handleInvalidAccount(InvalidAccountException exception, WebRequest request) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        return handleExceptionInternal(exception, problem, new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Object> handleForbidden(org.springframework.security.access.AccessDeniedException exception, WebRequest request) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access is forbidden");
+        return handleExceptionInternal(exception, problem, new HttpHeaders(), HttpStatus.FORBIDDEN, request);
     }
 
     @ExceptionHandler(Exception.class)

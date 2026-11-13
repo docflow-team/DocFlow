@@ -1,6 +1,9 @@
 package at.fhtw.docflow.identity.application;
 
 import at.fhtw.docflow.identity.domain.User;
+import at.fhtw.docflow.identity.domain.UserRole;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,5 +61,26 @@ public class DefaultAuthenticationService implements AuthenticationService {
             throw new InvalidPasswordException("newPassword", exception.getMessage());
         }
         users.save(user.changePassword(hash));
+    }
+
+    public User createUser(String username, String email, UserRole role, String temporaryPassword) {
+        User administrator = users.findById(currentUser.id()).orElseThrow(() -> new AccessDeniedException("Administrator access required"));
+        if (!administrator.enabled() || administrator.mustChangePassword() || administrator.role() != UserRole.ADMIN) {
+            throw new AccessDeniedException("Administrator access required");
+        }
+
+        String hash;
+        try {
+            hash = passwords.hash(temporaryPassword);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidPasswordException("temporaryPassword", exception.getMessage());
+        }
+        User user;
+        try {
+            user = User.newAccount(username, email, hash, role);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidAccountException(exception.getMessage());
+        }
+        return users.save(user);
     }
 }

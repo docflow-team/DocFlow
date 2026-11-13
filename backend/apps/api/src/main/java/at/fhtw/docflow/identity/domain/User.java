@@ -25,7 +25,11 @@ public record User(Long id, String username, String email, String passwordHash, 
     }
 
     public static User initialAdmin(String username, String email, String passwordHash) {
-        return new User(null, username, email, passwordHash, UserRole.ADMIN, true, true, 0);
+        return newAccount(username, email, passwordHash, UserRole.ADMIN);
+    }
+
+    public static User newAccount(String username, String email, String passwordHash, UserRole role) {
+        return new User(null, username, email, passwordHash, role, true, true, 0);
     }
 
     public User revokeTokens() {

@@ -2,6 +2,7 @@ package at.fhtw.docflow.identity.security;
 
 import at.fhtw.docflow.identity.application.PasswordHasher;
 import at.fhtw.docflow.identity.application.UserRepository;
+import at.fhtw.docflow.identity.api.AdminUserController.CreateUserRequest;
 import at.fhtw.docflow.identity.domain.User;
 import at.fhtw.docflow.identity.domain.UserRole;
 import org.junit.jupiter.api.Test;
@@ -11,11 +12,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -45,15 +46,20 @@ class AuthenticationIntegrationTest {
     }
 
     private String login(User user) throws Exception {
+        String token = login(" " + user.email().toUpperCase() + " ", PASSWORD);
+        assertEquals(user.id().toString(), decoder.decode(token).getSubject());
+        return token;
+    }
+
+    private String login(String name, String password) throws Exception {
         var result = mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                        .content(json.writeValueAsString(Map.of("login", " " + user.email().toUpperCase() + " ", "password", PASSWORD))))
+                        .content(json.writeValueAsString(Map.of("login", name, "password", password))))
                 .andExpect(status().isOk()).andExpect(content().contentType("application/json"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer")).andExpect(jsonPath("$.expiresIn").value(900))
                 .andExpect(jsonPath("$.user.passwordHash").doesNotExist()).andExpect(jsonPath("$.user.tokenVersion").doesNotExist())
                 .andReturn();
         String token = json.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
         Jwt decoded = decoder.decode(token);
-        assertEquals(user.id().toString(), decoded.getSubject());
         assertEquals(900, decoded.getExpiresAt().getEpochSecond() - decoded.getIssuedAt().getEpochSecond());
         return token;
     }
@@ -186,5 +192,118 @@ class AuthenticationIntegrationTest {
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),
                 JwtClaimsSet.builder().subject(user.id().toString()).issuer(issuer).audience(List.of(audience))
                         .issuedAt(start).expiresAt(start.plusSeconds(900)).claim("ver", user.tokenVersion()).build())).getTokenValue();
+    }
+    private Map<String, Object> request() {
+        String name = "created-" + UUID.randomUUID().toString().substring(0, 8);
+        return new LinkedHashMap<>(Map.of("username", name, "email", name + "@example.invalid",
+                "role", "USER", "temporaryPassword", PASSWORD));
+    }
+
+    @Test
+    void adminCreatesAccountThatMustChangePasswordBeforeAccessingDocuments() throws Exception {
+        User admin = account(UserRole.ADMIN, false, true);
+        String adminToken = login(admin.username(), PASSWORD);
+        var payload = request();
+        String name = (String) payload.get("username");
+        payload.put("username", " " + name.toUpperCase() + " ");
+        payload.put("email", " " + name.toUpperCase() + "@EXAMPLE.INVALID ");
+
+        var result = mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + adminToken)
+                        .contentType("application/json").content(json.writeValueAsString(payload)))
+                .andExpect(status().isCreated()).andExpect(content().contentType("application/json"))
+                .andExpect(jsonPath("$.username").value(name)).andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(jsonPath("$.enabled").value(true)).andExpect(jsonPath("$.mustChangePassword").value(true))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist()).andExpect(jsonPath("$.temporaryPassword").doesNotExist())
+                .andExpect(jsonPath("$.tokenVersion").doesNotExist()).andReturn();
+        long id = json.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        assertEquals("/api/v1/admin/users/" + id, result.getResponse().getHeader("Location"));
+        assertFalse(result.getResponse().getContentAsString().contains(PASSWORD));
+        User saved = users.findById(id).orElseThrow();
+        assertEquals(name + "@example.invalid", saved.email());
+        assertEquals(0, saved.tokenVersion());
+        assertTrue(saved.passwordHash().startsWith("{bcrypt}"));
+        assertTrue(passwords.matches(PASSWORD, saved.passwordHash()));
+
+        String temporaryToken = login(saved.email(), PASSWORD);
+        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + temporaryToken)).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/auth/password").header("Authorization", "Bearer " + temporaryToken).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("currentPassword", PASSWORD, "newPassword", "NewSyntheticPassword"))))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + temporaryToken)).andExpect(status().isUnauthorized());
+        String changedToken = login(name, "NewSyntheticPassword");
+        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + changedToken)).andExpect(status().isOk());
+    }
+
+    @Test
+    void adminMayCreateAnotherAdministratorWithTheSameTemporaryPasswordRules() throws Exception {
+        User admin = account(UserRole.ADMIN, false, true);
+        String token = login(admin.username(), PASSWORD);
+        var payload = request();
+        payload.put("role", "ADMIN");
+        mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + token).contentType("application/json")
+                        .content(json.writeValueAsString(payload)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.mustChangePassword").value(true));
+        assertEquals(admin, users.findById(admin.id()).orElseThrow());
+    }
+
+    @Test
+    void anonymousUsersOrdinaryUsersAndTemporaryAdministratorsCannotCreateAccounts() throws Exception {
+        var payload = request();
+        mvc.perform(post("/api/v1/admin/users").contentType("application/json").content(json.writeValueAsString(payload)))
+                .andExpect(status().isUnauthorized());
+        for (User user : List.of(account(UserRole.USER, false, true), account(UserRole.ADMIN, true, true))) {
+            String token = login(user.username(), PASSWORD);
+            mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + token).contentType("application/json")
+                            .content(json.writeValueAsString(payload)))
+                    .andExpect(status().isForbidden()).andExpect(content().contentType("application/json"));
+        }
+        assertTrue(users.findByUsername((String) payload.get("username")).isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidFieldsAndPasswordByteLimitsWithoutEchoingSecrets() throws Exception {
+        User admin = account(UserRole.ADMIN, false, true);
+        String token = login(admin.username(), PASSWORD);
+        for (var invalid : List.of(Map.of("username", "ab"), Map.of("username", "with@symbol"), Map.of("email", "invalid"),
+                Map.of("role", "OWNER"), Map.of("temporaryPassword", "short"), Map.of("temporaryPassword", "\u00e9".repeat(37)))) {
+            var payload = request();
+            payload.putAll(invalid);
+            var result = mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + token)
+                            .contentType("application/json").content(json.writeValueAsString(payload)))
+                    .andExpect(status().isBadRequest()).andExpect(content().contentType("application/json")).andReturn();
+            assertFalse(result.getResponse().getContentAsString().contains((String) payload.get("temporaryPassword")));
+            assertTrue(users.findByUsername((String) payload.get("username")).isEmpty());
+        }
+        var payload = request();
+        payload.remove("temporaryPassword");
+        mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(json.writeValueAsString(payload)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.temporaryPassword").exists());
+        assertFalse(new CreateUserRequest("test", "test@example.invalid", UserRole.USER, PASSWORD).toString().contains(PASSWORD));
+    }
+
+    @Test
+    void normalizedDuplicateIdentifiersReturnConflictWithoutChangingExistingCredentials() throws Exception {
+        User admin = account(UserRole.ADMIN, false, true);
+        String token = login(admin.username(), PASSWORD);
+        var payload = request();
+        mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(json.writeValueAsString(payload))).andExpect(status().isCreated());
+        User original = users.findByUsername((String) payload.get("username")).orElseThrow();
+        for (var duplicate : List.of(Map.of("username", " " + original.username().toUpperCase() + " "),
+                Map.of("email", " " + original.email().toUpperCase() + " "))) {
+            var conflicting = request();
+            conflicting.putAll(duplicate);
+            var result = mvc.perform(post("/api/v1/admin/users").header("Authorization", "Bearer " + token)
+                            .contentType("application/json").content(json.writeValueAsString(conflicting)))
+                    .andExpect(status().isConflict()).andExpect(content().contentType("application/json")).andReturn();
+            String body = result.getResponse().getContentAsString();
+            assertFalse(body.contains(original.passwordHash()));
+            assertFalse(body.contains(PASSWORD));
+            assertFalse(body.contains("SQL"));
+            assertFalse(body.contains("api.users"));
+        }
+        assertEquals(original, users.findById(original.id()).orElseThrow());
     }
 }

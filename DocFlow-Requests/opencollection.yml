@@ -13,5 +13,6 @@ extensions:
 docs: Use Local. Run Login with local credentials; its token is captured only as a
   runtime variable. Change a temporary password, then log in again. Protected requests
   use accessToken. Metadata belongs to the logged-in user; shared type creation requires
-  ADMIN. PDF upload is not implemented yet. Do not save real passwords or tokens.
+  ADMIN. Use Create user with an ADMIN token after password change; new accounts must
+  change their temporary password. PDF upload is not implemented yet. Do not save real passwords or tokens.
   See README and contracts/openapi.yaml for implemented behavior.

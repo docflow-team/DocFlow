@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: DocFlow API
-  version: sprint-2-task-5
-  description: Authentication and owner-scoped metadata. PDF upload and category replacement
+  version: sprint-2-task-6
+  description: Account creation, authentication and owner-scoped metadata. PDF upload and category replacement
     are not implemented yet.
 servers:
 - url: /
@@ -422,6 +422,59 @@ paths:
         schema:
           type: integer
           format: int64
+  /api/v1/admin/users:
+    post:
+      summary: Create an account (ADMIN only)
+      description: Requires an enabled administrator who has changed their temporary password. Creates an enabled USER or ADMIN with mustChangePassword=true. Identifiers are trimmed/lowercased; passwords are never normalized.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Created account; password change required before document access
+          headers:
+            Location:
+              description: Identifier URI of the created account
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid identifiers, role or temporary password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Administrator access or password change required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Username/email already exists or a database constraint prevents creation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
 components:
   securitySchemes:
     bearerAuth:
@@ -429,6 +482,31 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    CreateUserRequest:
+      type: object
+      required:
+      - username
+      - email
+      - role
+      - temporaryPassword
+      properties:
+        username:
+          type: string
+          description: 3-50 letters, digits, dots, underscores or hyphens after trimming; stored lowercase
+        email:
+          type: string
+          description: Valid email, at most 254 characters after trimming; stored lowercase
+        role:
+          type: string
+          enum:
+          - USER
+          - ADMIN
+        temporaryPassword:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 8
+          description: At most 72 UTF-8 bytes; do not trim or normalize
     LoginRequest:
       type: object
       properties:

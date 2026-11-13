@@ -4,6 +4,10 @@ import at.fhtw.docflow.identity.domain.User;
 import at.fhtw.docflow.identity.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.security.access.AccessDeniedException;
+import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
 import org.mockito.ArgumentCaptor;
 
 import java.util.Optional;
@@ -61,6 +65,63 @@ class AuthenticationServiceTest {
     void incorrectCurrentPasswordDoesNotWriteAccountState() {
         when(users.findById(1L)).thenReturn(Optional.of(user));
         assertThrows(InvalidPasswordException.class, () -> service.changePassword("wrong", "new-password"));
+        verify(users, never()).save(any());
+    }
+    @ParameterizedTest
+    @EnumSource(UserRole.class)
+    void createsNormalizedAccountWithHashedTemporaryPassword(UserRole role) {
+        when(users.findById(1L)).thenReturn(Optional.of(
+                new User(1L, "admin", "admin@example.invalid", "admin-hash", UserRole.ADMIN, true, false, 2)));
+        when(passwords.hash(" ExactPassword ")).thenReturn("encoded-password");
+        when(users.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        User result = service.createUser(" Team.User ", " TEAM@example.invalid ", role, " ExactPassword ");
+
+        verify(users).save(result);
+        assertEquals("team.user", result.username());
+        assertEquals("team@example.invalid", result.email());
+        assertEquals("encoded-password", result.passwordHash());
+        assertEquals(role, result.role());
+        assertTrue(result.enabled());
+        assertTrue(result.mustChangePassword());
+        assertEquals(0, result.tokenVersion());
+        assertNull(result.id());
+    }
+
+    @Test
+    void requiresAnEnabledAdministratorWhoHasChangedTheirPassword() {
+        for (User denied : new User[]{
+                new User(1L, "admin", "admin@example.invalid", "hash", UserRole.USER, true, false, 0),
+                new User(1L, "admin", "admin@example.invalid", "hash", UserRole.ADMIN, true, true, 0),
+                new User(1L, "admin", "admin@example.invalid", "hash", UserRole.ADMIN, false, false, 0)}) {
+            when(users.findById(1L)).thenReturn(Optional.of(denied));
+            assertThrows(AccessDeniedException.class,
+                    () -> service.createUser("new-user", "new@example.invalid", UserRole.USER, "SyntheticPassword"));
+        }
+        verify(passwords, never()).hash("SyntheticPassword");
+        verify(users, never()).save(any());
+    }
+
+    @Test
+    void passwordValidationUsesHasherAndIdentifiesTheTemporaryPasswordField() {
+        when(users.findById(1L)).thenReturn(Optional.of(
+                new User(1L, "admin", "admin@example.invalid", "admin-hash", UserRole.ADMIN, true, false, 2)));
+        when(passwords.hash("short")).thenThrow(new IllegalArgumentException("Password is too short"));
+        var error = assertThrows(InvalidPasswordException.class,
+                () -> service.createUser("new-user", "new@example.invalid", UserRole.USER, "short"));
+        assertEquals("temporaryPassword", error.field());
+        verify(users, never()).save(any());
+    }
+
+    @Test
+    void identifierValidationUsesTheUserModel() {
+        when(users.findById(1L)).thenReturn(Optional.of(
+                new User(1L, "admin", "admin@example.invalid", "admin-hash", UserRole.ADMIN, true, false, 2)));
+        when(passwords.hash(anyString())).thenReturn("hash");
+        assertThrows(InvalidAccountException.class,
+                () -> service.createUser("ab", "new@example.invalid", UserRole.USER, "SyntheticPassword"));
+        assertThrows(InvalidAccountException.class,
+                () -> service.createUser("new-user", "invalid-email", UserRole.USER, "SyntheticPassword"));
         verify(users, never()).save(any());
     }
 }

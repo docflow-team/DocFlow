@@ -135,6 +135,7 @@ Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire 
 | GET | `/api/v1/auth/me` | Current user |
 | PUT | `/api/v1/auth/password` | `{currentPassword, newPassword}`; then log in again |
 | POST | `/api/v1/auth/logout` | Revoke tokens |
+| POST | `/api/v1/admin/users` | ADMIN creates `{username, email, role, temporaryPassword}`; `201` |
 
 | Method | Route | Success |
 | --- | --- | --- |

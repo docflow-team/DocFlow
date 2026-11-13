@@ -222,7 +222,7 @@ Use `/api/v1` for application endpoints and retain public `GET /api/health` for 
 | `GET /auth/me` | Current authenticated user |
 | `POST /auth/logout` | Revoke outstanding tokens; `204` |
 | `PUT /auth/password` | `{currentPassword, newPassword}`; revoke tokens and return to login; `204` |
-| `POST /admin/users` | ADMIN creates `{username, email, role, temporaryPassword}`; `201` |
+| `POST /admin/users` | ADMIN creates `{username, email, role, temporaryPassword}`; `201` with safe UserResponse and Location |
 | `POST /documents` | Multipart `file`, `title`, optional `description`; `202` UploadResponse |
 | `GET /documents` | Paginated owner-only list |
 | `GET /documents/{id}` | Owner-only document details |
@@ -234,7 +234,7 @@ Use `/api/v1` for application endpoints and retain public `GET /api/health` for 
 | `PUT /documents/{id}/categories` | Replace own document's `{categoryIds: [...]}` |
 | `PUT /documents/{id}/tags` | Replace own document's `{tags: [...]}` |
 
-Only account creation is needed for administration in this sprint; use Bruno or HTTP examples rather than building an admin screen. Users cannot read another owner's documents, including when they are administrators. Temporary-password accounts may only change their password or log out. Keep tokens in memory; logout/expiry clears private frontend state.
+Only account creation is needed for administration in this sprint; use Bruno or HTTP examples rather than building an admin screen. Created accounts are enabled, require a password change and start at token version 0; these fields and the generated ID are server-controlled. Username/email conflicts return `409`. Users cannot read another owner's documents, including when they are administrators. Temporary-password accounts may only change their password or log out. Keep tokens in memory; logout/expiry clears private frontend state.
 
 #### Data and validation
 

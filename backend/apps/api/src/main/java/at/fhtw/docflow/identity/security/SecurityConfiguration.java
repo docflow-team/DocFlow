@@ -26,7 +26,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers("/api/v1/auth/password", "/api/v1/auth/logout").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/document-types").access(org.springframework.security.authorization.AuthorizationManagers.allOf(
+                        .requestMatchers(HttpMethod.POST, "/api/document-types", "/api/v1/admin/users").access(org.springframework.security.authorization.AuthorizationManagers.allOf(
                                 org.springframework.security.authorization.AuthorityAuthorizationManager.hasRole("ADMIN"),
                                 org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("PASSWORD_CHANGED")))
                         .anyRequest().hasAuthority("PASSWORD_CHANGED"))

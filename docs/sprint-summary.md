@@ -6,7 +6,7 @@
 
 **Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature. Sprint 2 has moved the application into a Maven API module and separated its HTTP, business and persistence boundaries using MapStruct, without changing its HTTP behavior.
 
-User persistence, password hashing and explicit first-admin bootstrap are now implemented. Login/current-user/logout/password-change endpoints and owner-scoped metadata operations are implemented. Normal API startup uses `ddl-auto=update` in the `api` schema, retaining existing rows across restarts.
+User persistence, password hashing and explicit first-admin bootstrap are now implemented. Login/current-user/logout/password-change endpoints, admin-only account creation and owner-scoped metadata operations are implemented. Normal API startup uses `ddl-auto=update` in the `api` schema, retaining existing rows across restarts.
 
 ## Sprint goal
 
@@ -170,6 +170,7 @@ The explicit `bootstrap-admin` profile uses **validate**, starts without an HTTP
 | GET | `/api/v1/auth/me` | Current user after password change |
 | PUT | `/api/v1/auth/password` | Check current password, update hash, clear temporary flag and revoke tokens; 204 |
 | POST | `/api/v1/auth/logout` | Revoke all outstanding account tokens; 204 |
+| POST | `/api/v1/admin/users` | ADMIN creates an enabled account with a temporary password; 201 and Location |
 
 JWT signature/issuer/audience/expiry are validated by Spring Security. Each authenticated request reads current enabled/role/password-change/token-version state. Temporary-password accounts can only change password or log out. HTTP Basic, form login, session authentication and default logout are disabled; the API uses bearer headers and no authentication cookies.
 
@@ -190,6 +191,8 @@ Restructuring verification on 12 November 2026: the baseline suite passed before
 Layering verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **42 tests, 0 failures, 0 errors, 0 skipped**. New checks exercise metadata invariants without Spring, request/entity mapping of protected fields and null descriptions, conversion of shared type entities into IDs, and service protection against incoming identity/time/assignment changes. An H2 round-trip test uses the actual service proxies, adapters and generated mappers across transactions; repeated assignment remains unique, metadata updates preserve assignments, and document deletion preserves the shared type. PostgreSQL integration-test automation and the coverage gate remain pending.
 
 The image rebuilt successfully after the layering changes. An isolated Compose deployment with PostgreSQL passed **24 HTTP checks** across all nine operations, including reads and metadata updates after assignment, repeated assignment, description clearing and shared-type preservation after deletion. The temporary containers, network and database volume were removed.
+
+Account-creation verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **73 tests, 0 failures, 0 errors, 0 skipped**. Business and real Spring filter-chain/JWT/H2 tests cover USER/ADMIN creation, authorization, normalized identifiers, password hashing/limits, database uniqueness, safe responses and the new account's first password change. Account creation reuses the existing authentication service and test fixtures; database constraints provide one source of uniqueness enforcement and a safe `409` response. The Docker image build and Compose configuration passed. An isolated PostgreSQL deployment passed **40 HTTP checks**, including creation, access restrictions, validation/conflicts, owner isolation and restart persistence. Password/token log checks passed. Disposable containers, network and volume were removed; existing project data was untouched.
 
 Authentication/ownership verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **63 tests, 0 failures, 0 errors, 0 skipped**. Added isolated business and real Spring filter-chain/JWT/H2 tests cover authentication, password validation/change, temporary-password restrictions, global token revocation, disabled accounts, JWT signature/issuer/audience/expiry and owner isolation including administrators. The image build and Compose configuration passed. The final isolated PostgreSQL deployment passed **27 HTTP checks**, including bootstrap without a signing secret, hiding legacy unowned rows, role restrictions and persistence after restart. Password/token log checks passed. Disposable containers, network and volume were removed; existing project data was untouched.
 
@@ -221,11 +224,13 @@ The test suite covers:
 
 GitHub Actions runs **clean verify** for pull requests and pushes to **dev** or **main**. After successful tests, it also verifies the backend Docker image build. A coverage gate and PostgreSQL integration tests are not configured yet.
 
+Account creation accepts username, email, USER/ADMIN role and a temporary password through the existing authentication service. Identifier validation and normalization use the User model, and password validation/hashing use the existing hasher. The caller must be an enabled administrator with password change completed. Accounts start enabled, must change password and have token version 0; credentials and internal token state are absent from the response. Database constraints reject duplicate normalized identifiers with safe `409` errors. Bruno and the shared auth HTTP examples demonstrate creation and first login.
+
 ## Known limitations
 
 - Only metadata is stored; PDF upload and file storage are not implemented.
 - MinIO or another object store is not connected.
-- Account creation through the API is the next task; only explicit first-admin bootstrap is available so far.
+- Account listing, editing, disabling, password reset and administration screens remain deferred.
 - Older metadata without an owner is hidden; no automatic reassignment is provided.
 - Login throttling is deferred until hosted access.
 - Document types currently provide only create and list operations.

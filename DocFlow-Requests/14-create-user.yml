@@ -1,0 +1,25 @@
+info:
+  name: Create user
+  type: http
+  seq: 14
+http:
+  method: POST
+  url: '{{baseUrl}}/api/v1/admin/users'
+  headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "username": "student",
+        "email": "student@example.invalid",
+        "role": "USER",
+        "temporaryPassword": "replace-locally-with-temporary-password"
+      }
+docs: |
+  Use an ADMIN token after completing the initial password change. Replace the local
+  account details and temporary password before sending; do not save real credentials.
+  The created account must change its password after login.
