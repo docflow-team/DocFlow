@@ -1,5 +1,6 @@
 package at.fhtw.docflow.identity.security;
 
+import at.fhtw.docflow.document.application.DocumentStorage;
 import at.fhtw.docflow.identity.application.PasswordHasher;
 import at.fhtw.docflow.identity.application.UserRepository;
 import at.fhtw.docflow.identity.api.AdminUserController.CreateUserRequest;
@@ -32,6 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 class AuthenticationIntegrationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    DocumentStorage documentStorage;
+
     private static final String PASSWORD = " SyntheticPassword ";
     @Autowired MockMvc mvc;
     @Autowired JsonMapper json;

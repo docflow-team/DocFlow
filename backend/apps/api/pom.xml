@@ -25,6 +25,17 @@
 			<version>${mapstruct.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>io.minio</groupId>
+			<artifactId>minio</artifactId>
+			<version>9.0.3</version>
+		</dependency>
+		<!-- The SDK's multiplatform OkHttp dependency needs its JVM implementation with Maven. -->
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp-jvm</artifactId>
+			<version>5.3.2</version>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>

@@ -14,7 +14,7 @@ Copy the committed example configuration to the ignored local `.env` file:
 cp .env.example .env
 ```
 
-Replace the example `POSTGRES_PASSWORD` in `.env` with your own local PostgreSQL password. The example file contains no real secret, and `.env` must not be committed.
+Replace the example `POSTGRES_PASSWORD` and set `MINIO_ROOT_PASSWORD` in `.env` to your own local passwords; MinIO requires at least 8 characters. If you already have `.env`, add the MinIO settings from `.env.example`. Keep `.env` out of Git.
 
 Set `DOCFLOW_JWT_SECRET` in `.env` to a generated value:
 
@@ -40,10 +40,13 @@ docker compose up --build --detach --wait
 docker compose ps
 ```
 
+The first MinIO build downloads and compiles its pinned source inside Docker, which can take several minutes. The API creates `MINIO_BUCKET` if missing; restarting retains the bucket and stored files.
+
 With the default ports, the endpoints are:
 
 - Health: `http://localhost:8080/api/health`
 - Documents: `http://localhost:8080/api/documents`
+- MinIO console: `http://localhost:9001` (credentials from `.env`)
 
 Follow the backend logs with:
 
@@ -51,7 +54,7 @@ Follow the backend logs with:
 docker compose logs --follow backend
 ```
 
-Stop the stack while retaining its PostgreSQL volume:
+Stop the stack while retaining its PostgreSQL and MinIO volumes:
 
 ```bash
 docker compose down
@@ -111,7 +114,7 @@ Run from `backend/`:
 
 The parent build includes the API module. Service/controller tests mock I/O, domain/mapping tests run without Spring, and application-context/adapter round-trip tests use H2; tests do not require Docker. Reports are written to `backend/apps/api/target/surefire-reports/`. On Windows, use `mvnw.cmd`.
 
-With PostgreSQL running and the datasource and `DOCFLOW_JWT_SECRET` environment variables set, start the API from `backend/`:
+With PostgreSQL and MinIO running and the datasource, MinIO and `DOCFLOW_JWT_SECRET` environment variables set, start the API from `backend/`:
 
 ```bash
 ./mvnw -pl apps/api spring-boot:run

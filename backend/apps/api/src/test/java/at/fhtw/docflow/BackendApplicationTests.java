@@ -1,6 +1,7 @@
 package at.fhtw.docflow;
 
 import at.fhtw.docflow.document.application.DocumentService;
+import at.fhtw.docflow.document.application.DocumentStorage;
 import at.fhtw.docflow.document.application.DocumentTypeService;
 import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.domain.DocumentType;
@@ -20,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.*;
         "docflow.jwt.secret=synthetic-test-key-at-least-thirty-two-bytes"
 })
 class BackendApplicationTests {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    DocumentStorage documentStorage;
+
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     at.fhtw.docflow.identity.application.CurrentUser currentUser;
 

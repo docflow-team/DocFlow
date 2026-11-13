@@ -278,14 +278,16 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | MapStruct | 1.6.3 library and annotation processor in `backend/apps/api/pom.xml` |
 | Spring Security / JWT | Boot-managed security and OAuth2 resource-server starters with JOSE support |
 | springdoc | Planned candidate: 3.1.1; not installed |
-| PDFBox / MinIO SDK | Planned candidates: 3.0.8 / 9.0.3; not installed |
-| OkHttp JVM | Planned candidate: 5.3.2 if required by the selected MinIO SDK; not installed |
+| PDFBox | Planned candidate: 3.0.8; not installed |
+| MinIO SDK / OkHttp JVM | 9.0.3 / 5.3.2 in `backend/apps/api/pom.xml` |
 | JaCoCo | Planned candidate: 0.8.14 with a coverage gate above 70% and an 80% target; not configured |
 | PostgreSQL | Compose: 18.6; planned disposable tests: 18.3 Alpine (not configured) |
-| MinIO server | Planned pinned source release and commit in `infra/minio/Dockerfile`; file/service not yet implemented |
+| MinIO server | `RELEASE.2025-10-15T17-29-55Z`, source revision `9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a`; SHA-256 checked in `infra/minio/Dockerfile`, built with Go 1.27.4 |
 | Java images | Maven/Temurin 25 tags in `backend/Dockerfile`; not digest-pinned |
 
 Verify planned dependency compatibility when each feature is introduced; candidate versions are not installed-version evidence. Real storage integration tests will build the same MinIO Dockerfile. Keep its source archive and license notices. The pinned source-build approach is an accepted team decision; do not replace it with an assumed `latest` image.
+
+The MinIO image retains the exact source archive, LICENSE, NOTICE and CREDITS in `/usr/share/doc/minio/`. Its [upstream release](https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z) identifies the source revision; the [SDK build](https://github.com/minio/minio-java/blob/9.0.3/build.gradle) specifies the matching OkHttp version. Compose runs it with a named volume, local-only ports and a readiness check. The API's `DocumentStorage` interface hides the SDK; its adapter generates object keys and creates the configured private bucket only if missing. Bootstrap excludes storage initialization. Bucket setup assumes one API instance during local startup; no initialization container, shared adapter module or cleanup framework is needed.
 
 When implementing the frontend, use Node.js 24 LTS, React 19, TypeScript and Vite with a committed npm lockfile. Check package engine/peer compatibility then, particularly TypeScript with typescript-eslint. Select worker, broker, ELK, Nginx and PWA plugin versions when introducing those components; keep Elasticsearch, Logstash and Kibana versions matched. Add no speculative retry/circuit-breaker library. Framework features and bounded retries are sufficient initially.
 
@@ -294,7 +296,7 @@ When implementing the frontend, use Node.js 24 LTS, React 19, TypeScript and Vit
 - `backend/`: Maven parent/Wrapper and `apps/api`, organized by feature with API, application/domain, persistence, integration and configuration packages.
 - Add separate `apps/ocr-worker`, `apps/indexing-worker`, `apps/genai-worker`, and `apps/batch-worker` as their sprint features arrive. Share message contracts when needed, never JPA entities or a common business model. Add focused cross-application tests with those features.
 - `frontend/`: React/PWA application. Group by feature, extracting shared API/components only for real reuse. Maven builds Java; npm builds React.
-- `infra/`: planned MinIO Dockerfile and Nginx configuration in Sprint 2; RabbitMQ, Elasticsearch, Logstash and Kibana configuration arrive with their features.
+- `infra/`: PostgreSQL namespace provisioning and the MinIO source Dockerfile; Nginx, RabbitMQ, Elasticsearch, Logstash and Kibana configuration arrive with their features.
 - `contracts/`: exported OpenAPI and later versioned event schemas and XML XSD. `tests/`: HTTP examples and later end-to-end fixtures/scenarios.
 - `docs/`: architecture here, task progress in `sprint-2-progress.md`, delivered functionality/verification in the sprint summary, setup/usage in README. Add other documents/scripts only when they have a concrete purpose.
 

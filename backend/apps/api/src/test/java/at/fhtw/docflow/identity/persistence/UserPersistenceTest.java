@@ -1,5 +1,6 @@
 package at.fhtw.docflow.identity.persistence;
 
+import at.fhtw.docflow.document.application.DocumentStorage;
 import at.fhtw.docflow.identity.application.AdminBootstrapService;
 import at.fhtw.docflow.identity.application.PasswordHasher;
 import at.fhtw.docflow.identity.application.UserRepository;
@@ -20,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
         "docflow.jwt.secret=synthetic-test-key-at-least-thirty-two-bytes"
 })
 class UserPersistenceTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    DocumentStorage documentStorage;
 
     @Test
     void bootstrapAndUserStateRoundTripWithoutResettingExistingCredentials(
