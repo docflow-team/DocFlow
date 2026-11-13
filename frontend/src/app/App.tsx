@@ -11,6 +11,9 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { LoginPage, PasswordPage } from '../features/authentication/AuthPages';
 import { useSession } from '../features/authentication/session';
+import { DocumentDetailPage } from '../features/documents/DocumentDetailPage';
+import { DocumentsListPage } from '../features/documents/DocumentsListPage';
+import { DocumentUploadPage } from '../features/documents/DocumentUploadPage';
 import styles from './App.module.css';
 
 function ProtectedRoutes() {
@@ -82,22 +85,9 @@ export function App() {
         />
         <Route element={<ProtectedRoutes />}>
           <Route path="/password" element={<PasswordPage />} />
-          <Route
-            path="/documents"
-            element={
-              <section className={styles.intro}>
-                <p className={styles.eyebrow}>A little less paperwork.</p>
-                <h1 tabIndex={-1}>
-                  Your documents.
-                  <br />
-                  <span>One clear space.</span>
-                </h1>
-                <p className={styles.description}>
-                  A home for your PDFs, tags and categories.
-                </p>
-              </section>
-            }
-          />
+          <Route path="/documents" element={<DocumentsListPage />} />
+          <Route path="/documents/new" element={<DocumentUploadPage />} />
+          <Route path="/documents/:id" element={<DocumentDetailPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/documents" replace />} />
       </Routes>

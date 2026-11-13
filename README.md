@@ -139,7 +139,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite forwards `/api` to the backend at `http://localhost:8080`. Sign in with an admin-created account; temporary passwords must be changed first. Reloading ends the session. Document screens are still pending.
+Open `http://localhost:5173`. Vite forwards `/api` to the backend at `http://localhost:8080`. Sign in with an admin-created account; temporary passwords must be changed first. Reloading ends the session. After signing in, use the web UI to list, upload, inspect, edit metadata for, download and delete your PDFs; UI category/tag editing and Nginx serving remain pending.
 
 Run frontend checks from `frontend/`:
 

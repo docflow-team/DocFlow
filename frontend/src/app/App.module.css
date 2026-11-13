@@ -21,38 +21,20 @@
 .wordmark span {
   color: #27785d;
 }
-.caption,
-.eyebrow {
+.caption {
   font-size: 0.75rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-.caption {
   color: #56645e;
 }
 .intro {
   padding-top: clamp(4rem, 13vw, 10rem);
-}
-.eyebrow {
-  margin: 0 0 1.5rem;
-  color: #31614e;
-  font-weight: 650;
 }
 .intro h1 {
   margin: 0;
   font-size: clamp(2.5rem, 7vw, 5.5rem);
   line-height: 1.08;
   letter-spacing: -0.055em;
-}
-.intro h1 span {
-  color: #32725b;
-}
-.description {
-  max-width: 28rem;
-  margin-top: 1.75rem;
-  color: #56645e;
-  font-size: 1.1rem;
-  line-height: 1.7;
 }
 
 @media (max-width: 480px) {

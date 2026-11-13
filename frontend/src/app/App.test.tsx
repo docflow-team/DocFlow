@@ -62,6 +62,9 @@ beforeEach(() => {
   api.mockImplementation(async (path) => {
     if (path === '/auth/login') return token;
     if (path === '/auth/me') return user;
+    if (path.startsWith('/documents?')) {
+      return { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 };
+    }
     return undefined;
   });
 });
@@ -310,6 +313,15 @@ it.each(['data', '401'])(
           resolve = ok;
           reject = fail;
         });
+      }
+      if (path.startsWith('/documents?')) {
+        return {
+          items: [],
+          page: 0,
+          size: 20,
+          totalElements: 0,
+          totalPages: 0,
+        };
       }
       return undefined;
     });
