@@ -40,7 +40,7 @@ public final class DocumentTestFixtures {
     public static Document document(long id, long owner) {
         Instant created = Instant.parse("2026-11-13T12:00:00Z");
         return new Document(id, owner, new Document.Metadata("Original", "Original description"),
-                "original.pdf", "documents/" + id + ".pdf", 512, created, created, Set.of());
+                "original.pdf", "documents/" + id + ".pdf", 512, created, created, Set.of(), Set.of());
     }
 
     public static Map<String, byte[]> mockStorage(DocumentStorage storage) {

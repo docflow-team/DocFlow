@@ -1,0 +1,19 @@
+info:
+  name: Replace document tags
+  type: http
+  seq: 17
+http:
+  method: PUT
+  url: '{{baseUrl}}/api/v1/documents/{{documentId}}/tags'
+  headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
+  - name: Content-Type
+    value: application/json
+  body:
+    type: json
+    data: |
+      {
+        "tags": [" Housing ", "housing", "Study"]
+      }
+docs: Returns the updated document with sorted normalized tags. Use an empty array to clear assignments; names are trimmed/lowercased and duplicates are removed.

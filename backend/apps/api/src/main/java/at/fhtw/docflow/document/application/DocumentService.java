@@ -12,6 +12,8 @@ public interface DocumentService {
     void deleteDocument(Long id);
     Document replaceCategories(Long documentId, List<Long> categoryIds);
 
+    Document replaceTags(Long documentId, List<String> tags);
+
     record DocumentPage(List<Document> items, int page, int size, long totalElements, int totalPages) { }
     record Download(String originalFilename, byte[] content) { }
 }

@@ -41,6 +41,12 @@ public class DocumentEntity {
             inverseJoinColumns = @JoinColumn(name = "document_type_id"))
     private Set<CategoryEntity> categories = new HashSet<>();
 
+    @ManyToMany
+    @JoinTable(name = "document_tags",
+            joinColumns = @JoinColumn(name = "document_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    private Set<TagEntity> tags = new HashSet<>();
+
     protected DocumentEntity() { }
     public Long getId() { return id; }
     public Long getOwnerId() { return ownerId; }
@@ -59,5 +65,6 @@ public class DocumentEntity {
     public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Set<TagEntity> getTags() { return tags; }
     public Set<CategoryEntity> getCategories() { return categories; }
 }

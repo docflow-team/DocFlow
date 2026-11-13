@@ -51,7 +51,7 @@ class DocumentTest {
     void assignmentsAreCopiedSortedAndCanBeReplacedOrCleared() {
         var source = new HashSet<>(Set.of(new Category(2L, "Invoice", null)));
         var document = new Document(1L, 1L, new Document.Metadata("File", null), "file.pdf",
-                "documents/file.pdf", 1, null, null, source);
+                "documents/file.pdf", 1, null, null, source, Set.of());
         source.clear();
         assertEquals(List.of(new Category(2L, "Invoice", null)), document.getCategories());
         assertThrows(UnsupportedOperationException.class, () -> document.getCategories().clear());
@@ -59,5 +59,36 @@ class DocumentTest {
         assertEquals(List.of("Contract", "Report"), document.getCategories().stream().map(Category::name).toList());
         document.replaceCategories(List.of());
         assertTrue(document.getCategories().isEmpty());
+    }
+
+    @Test
+    void tagsAreNormalizedDeduplicatedSortedAndDetachedFromInput() {
+        Document document = document(1, 7);
+        var incoming = new java.util.ArrayList<>(List.of(" Housing ", "housing", " STUDY ", "Machine learning"));
+        document.replaceTags(incoming);
+        incoming.clear();
+        assertEquals(List.of("housing", "machine learning", "study"), document.getTags());
+        assertThrows(UnsupportedOperationException.class, () -> document.getTags().clear());
+        document.replaceTags(java.util.Collections.nCopies(21, " Housing "));
+        assertEquals(List.of("housing"), document.getTags());
+        document.replaceTags(List.of());
+        assertTrue(document.getTags().isEmpty());
+    }
+
+    @Test
+    void tagLimitsApplyAfterNormalizationAndInvalidReplacementPreservesState() {
+        Document document = document(1, 7);
+        var maximum = java.util.stream.IntStream.range(0, 20)
+                .mapToObj(i -> "x".repeat(48) + String.format("%02d", i)).toList();
+        document.replaceTags(maximum);
+        assertEquals(maximum, document.getTags());
+        for (var invalid : List.of(List.of(""), List.of(" "), List.of("x".repeat(51)),
+                java.util.stream.IntStream.range(0, 21).mapToObj(i -> "tag" + i).toList(),
+                java.util.Arrays.asList("valid", null))) {
+            assertThrows(Document.InvalidDocumentException.class, () -> document.replaceTags(invalid));
+            assertEquals(maximum, document.getTags());
+        }
+        assertThrows(Document.InvalidDocumentException.class, () -> document.replaceTags(null));
+        assertEquals(maximum, document.getTags());
     }
 }

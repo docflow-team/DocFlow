@@ -16,12 +16,15 @@ public class JpaDocumentRepository implements DocumentRepository {
     private final SpringDataDocumentRepository documents;
     private final SpringDataCategoryRepository categories;
     private final DocumentPersistenceMapper mapper;
+    private final SpringDataTagRepository tags;
 
     public JpaDocumentRepository(SpringDataDocumentRepository documents,
-                                 SpringDataCategoryRepository categories, DocumentPersistenceMapper mapper) {
+                                 SpringDataCategoryRepository categories, DocumentPersistenceMapper mapper,
+                                 SpringDataTagRepository tags) {
         this.documents = documents;
         this.categories = categories;
         this.mapper = mapper;
+        this.tags = tags;
     }
 
     public Document save(Document document) {
@@ -39,6 +42,10 @@ public class JpaDocumentRepository implements DocumentRepository {
         }
         entity.getCategories().clear();
         entity.getCategories().addAll(assignedCategories);
+        entity.getTags().clear();
+        for (String name : document.getTags()) {
+            entity.getTags().add(tags.findByName(name).orElseGet(() -> tags.save(new TagEntity(name))));
+        }
         return mapper.toDomain(documents.saveAndFlush(entity));
     }
 

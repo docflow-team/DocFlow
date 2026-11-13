@@ -84,6 +84,11 @@ public class DocumentController {
         return mapper.toResponse(documents.replaceCategories(id, request.categoryIds()));
     }
 
+    @PutMapping(value = "/{id}/tags", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public DocumentResponse replaceTags(@PathVariable Long id, @Valid @RequestBody TagsRequest request) {
+        return mapper.toResponse(documents.replaceTags(id, request.tags()));
+    }
+
     private static ProcessingResponse notStarted(Long id) {
         return new ProcessingResponse(id, false, "NOT_STARTED", "NOT_STARTED", "NOT_STARTED", "NOT_STARTED");
     }
@@ -92,11 +97,12 @@ public class DocumentController {
                                 @Size(max = 255) String description) { }
     public record MetadataRequest(@NotBlank String title, @Size(max = 255) String description) { }
     public record DocumentResponse(Long id, String title, String description, String originalFilename,
-                                   String contentType, long sizeBytes, Instant createdAt, Instant updatedAt, List<CategoryResponse> categories) { }
+                                   String contentType, long sizeBytes, Instant createdAt, Instant updatedAt, List<CategoryResponse> categories, List<String> tags) { }
     public record UploadResponse(DocumentResponse document, String processingUrl, ProcessingResponse processing) { }
     public record ProcessingResponse(Long documentId, boolean processingAvailable, String ocr, String indexing,
                                      String summary, String classification) { }
     public record DocumentPageResponse(List<DocumentResponse> items, int page, int size,
                                        long totalElements, int totalPages) { }
+    public record TagsRequest(@NotNull List<@NotNull String> tags) { }
     public record CategoriesRequest(@NotNull List<@NotNull @Positive Long> categoryIds) { }
 }

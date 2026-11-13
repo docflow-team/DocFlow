@@ -14,11 +14,12 @@ public interface DocumentPersistenceMapper {
 
     Document.Metadata toMetadata(DocumentEntity entity);
 
-    // Persistence generates identity/timestamps; the adapter resolves shared categories.
+    // Persistence generates identity/timestamps; the adapter resolves shared categories and tags.
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "categories", ignore = true)
+    @Mapping(target = "tags", ignore = true)
     DocumentEntity toNewEntity(Document document);
 
     // Only title and description change; file identity, ownership, timestamps and assignments are protected.
@@ -31,7 +32,10 @@ public interface DocumentPersistenceMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "categories", ignore = true)
+    @Mapping(target = "tags", ignore = true)
     void updateMetadata(Document document, @MappingTarget DocumentEntity entity);
+
+    default String toTagName(TagEntity tag) { return tag.getName(); }
 
     Category toCategory(CategoryEntity entity);
 }

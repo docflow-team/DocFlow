@@ -45,6 +45,13 @@ Content-Type: application/json
 
 {"categoryIds":[{{categoryId}}]}
 
+### Replace tags; names are trimmed/lowercased and deduplicated; [] clears them
+PUT {{baseUrl}}/api/v1/documents/{{documentId}}/tags
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"tags":[" Housing ","housing","Study"]}
+
 ### Download PDF
 GET {{baseUrl}}/api/v1/documents/{{documentId}}/content
 Authorization: Bearer {{accessToken}}

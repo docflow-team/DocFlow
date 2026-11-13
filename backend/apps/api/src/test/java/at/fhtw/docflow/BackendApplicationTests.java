@@ -42,6 +42,11 @@ class BackendApplicationTests {
         byte[] content = pdf(1);
         Document first = documents.upload(new Document.Metadata("Layering", "Original"), "layering.pdf", "application/pdf", content);
         Document second = documents.upload(new Document.Metadata("Newer", null), "newer.pdf", "application/pdf", content);
+        assertTrue(first.getTags().isEmpty());
+        documents.replaceTags(first.getId(), List.of(" Housing ", "housing", "Study"));
+        documents.replaceTags(second.getId(), List.of("HOUSING"));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM api.tags", Integer.class));
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM api.document_tags", Integer.class));
         var labels = categories.findAll();
         assertEquals(7, labels.size());
         categories.seedDefaults();
@@ -66,6 +71,9 @@ class BackendApplicationTests {
         assertEquals("layering.pdf", updated.getOriginalFilename());
         assertEquals(content.length, updated.getSizeBytes());
         assertNull(updated.getDescription());
+        assertEquals(List.of("housing", "study"), updated.getTags());
+        assertThrows(Document.InvalidDocumentException.class, () -> documents.replaceTags(first.getId(), List.of("valid", " ")));
+        assertEquals(List.of("housing", "study"), documents.getDocumentById(first.getId()).getTags());
         assertEquals(List.of(type, report), documents.getDocumentById(first.getId()).getCategories());
         assertThrows(Document.InvalidDocumentException.class, () -> documents.replaceCategories(first.getId(), List.of(type.id(), 99999L)));
         assertEquals(List.of(type, report), documents.getDocumentById(first.getId()).getCategories());
@@ -74,6 +82,12 @@ class BackendApplicationTests {
         documents.replaceCategories(first.getId(), List.of());
         assertTrue(documents.getDocumentById(first.getId()).getCategories().isEmpty());
         documents.replaceCategories(first.getId(), List.of(type.id()));
+        assertEquals(List.of("housing", "study"), documents.getDocumentById(first.getId()).getTags());
+        documents.replaceTags(first.getId(), List.of("study"));
+        assertEquals(List.of("housing"), documents.getDocumentById(second.getId()).getTags());
+        documents.replaceTags(first.getId(), List.of());
+        assertTrue(documents.getDocumentById(first.getId()).getTags().isEmpty());
+        documents.replaceTags(first.getId(), List.of("housing", "study"));
         assertArrayEquals(content, documents.download(first.getId()).content());
         var page = documents.getAllDocuments(0, 1);
         assertEquals(2, page.totalElements());
@@ -85,7 +99,12 @@ class BackendApplicationTests {
         assertThrows(NoSuchElementException.class, () -> documents.deleteDocument(first.getId()));
         assertThrows(NoSuchElementException.class, () -> documents.getDocumentById(first.getId()));
         assertEquals(labels, categories.findAll());
+        assertEquals(List.of("housing"), documents.getDocumentById(second.getId()).getTags());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM api.tags", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM api.document_tags", Integer.class));
         documents.deleteDocument(second.getId());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM api.document_tags", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM api.tags", Integer.class));
         assertTrue(objects.isEmpty());
         assertEquals(0, documents.getAllDocuments(0, 20).totalElements());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM api.documents", Integer.class));

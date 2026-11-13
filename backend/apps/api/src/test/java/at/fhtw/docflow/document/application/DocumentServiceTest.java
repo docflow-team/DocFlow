@@ -182,4 +182,23 @@ class DocumentServiceTest {
         verify(documents, times(2)).save(original);
         verifyNoInteractions(storage);
     }
+
+    @Test
+    void tagReplacementIsOwnerScopedAndDoesNotSaveInvalidInputOrTouchStorage() {
+        var original = document(1, 1);
+        original.replaceCategories(List.of(new Category(2L, "Invoice", null)));
+        when(documents.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(original));
+        when(documents.save(original)).thenReturn(original);
+        var result = service.replaceTags(1L, List.of(" Housing ", "housing"));
+        assertEquals(List.of("housing"), result.getTags());
+        assertEquals(2L, result.getCategories().getFirst().id());
+        assertEquals("Original", result.getTitle());
+        assertEquals("documents/1.pdf", result.getObjectKey());
+        assertThrows(InvalidDocumentException.class, () -> service.replaceTags(1L, List.of("valid", " ")));
+        assertEquals(List.of("housing"), original.getTags());
+        assertThrows(NoSuchElementException.class, () -> service.replaceTags(9L, List.of("housing")));
+        assertTrue(service.replaceTags(1L, List.of()).getTags().isEmpty());
+        verify(documents, times(2)).save(original);
+        verifyNoInteractions(categories, storage);
+    }
 }

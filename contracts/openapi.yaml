@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: DocFlow API
-  version: sprint-2-task-9
-  description: Authentication, account creation, owner-only PDF management and seeded
-    manual categories. Background processing is unavailable.
+  version: sprint-2-task-10
+  description: Authentication, account creation, owner-only PDF management, manual
+    categories and normalized document tags. Background processing is unavailable.
 servers:
 - url: /
 security:
@@ -554,6 +554,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/documents/{id}/tags:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    put:
+      summary: Replace own document tags
+      description: Returns the updated document. Invalid input leaves existing assignments
+        unchanged. Shared tag rows are retained when assignments or documents are
+        removed. A concurrent first use of the same tag may return 409; retry the
+        replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagsRequest'
+      responses:
+        '200':
+          description: Updated document with normalized tags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Missing or invalid tags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Document not found for this owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: A stored-data conflict prevented replacement; retry the request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
 components:
   securitySchemes:
     bearerAuth:
@@ -655,6 +718,7 @@ components:
       - createdAt
       - updatedAt
       - categories
+      - tags
       properties:
         id:
           type: integer
@@ -691,6 +755,15 @@ components:
           items:
             $ref: '#/components/schemas/CategoryResponse'
           description: Current assignments sorted by name; empty means Unclassified
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          maxItems: 20
+          uniqueItems: true
+          description: Trimmed lowercase tag names, sorted; empty when untagged
     HealthResponse:
       type: object
       properties:
@@ -824,3 +897,16 @@ components:
             format: int64
             minimum: 1
           description: Known positive category IDs; empty array clears all assignments
+    TagsRequest:
+      type: object
+      required:
+      - tags
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+          description: Trimmed and lowercased using a locale-independent rule, then
+            deduplicated. Each normalized name must contain 1-50 characters and there
+            may be at most 20 unique names. Blank/null entries are rejected; [] clears
+            assignments.

@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Comparator;
 import java.util.Set;
+import java.util.Collection;
+import java.util.Locale;
 
 public class Document {
     public static final int MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -18,10 +20,11 @@ public class Document {
     private final Instant createdAt;
     private final Instant updatedAt;
     private final Set<Category> categories;
+    private final Set<String> tags = new HashSet<>();
 
     public Document(Long id, Long ownerId, Metadata metadata, String originalFilename,
                     String objectKey, long sizeBytes, Instant createdAt, Instant updatedAt,
-                    Set<Category> categories) {
+                    Set<Category> categories, Set<String> tags) {
         if (ownerId == null || ownerId <= 0 || metadata == null || objectKey == null || objectKey.isBlank()) {
             throw new InvalidDocumentException("Document ownership, metadata and stored content are required");
         }
@@ -37,6 +40,7 @@ public class Document {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.categories = new HashSet<>(categories == null ? Set.of() : categories);
+        replaceTags(tags == null ? Set.of() : tags);
     }
 
     public void updateMetadata(Metadata metadata) {
@@ -47,6 +51,22 @@ public class Document {
     public void replaceCategories(List<Category> categories) {
         this.categories.clear();
         this.categories.addAll(categories);
+    }
+
+    public void replaceTags(Collection<String> tags) {
+        if (tags == null) throw new InvalidDocumentException("Tags are required; use an empty list to clear them");
+        Set<String> normalized = new HashSet<>();
+        for (String tag : tags) {
+            if (tag == null) throw new InvalidDocumentException("Tags must not be null");
+            String name = tag.trim().toLowerCase(Locale.ROOT);
+            if (name.isBlank() || name.length() > 50) {
+                throw new InvalidDocumentException("Tags must contain 1-50 characters after normalization");
+            }
+            normalized.add(name);
+        }
+        if (normalized.size() > 20) throw new InvalidDocumentException("A document must not have more than 20 unique tags");
+        this.tags.clear();
+        this.tags.addAll(normalized);
     }
 
     public static String normalizeFilename(String filename) {
@@ -70,6 +90,8 @@ public class Document {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public List<Category> getCategories() { return categories.stream().sorted(Comparator.comparing(Category::name)).toList(); }
+
+    public List<String> getTags() { return tags.stream().sorted().toList(); }
 
     public record Metadata(String title, String description) {
         public Metadata {

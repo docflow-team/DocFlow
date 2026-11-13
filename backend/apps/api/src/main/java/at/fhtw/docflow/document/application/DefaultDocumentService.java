@@ -48,7 +48,7 @@ public class DefaultDocumentService implements DocumentService {
         try {
             // Include the actual commit in this boundary so commit failures also clean up the object.
             return transactions.execute(status -> documents.save(new Document(null, owner, metadata,
-                    originalFilename, key, content.length, null, null, Set.of())));
+                    originalFilename, key, content.length, null, null, Set.of(), Set.of())));
         } catch (RuntimeException exception) {
             removeObject(null, key);
             throw exception;
@@ -103,6 +103,13 @@ public class DefaultDocumentService implements DocumentService {
             throw new InvalidDocumentException("Unknown category ID");
         }
         document.replaceCategories(selected);
+        return documents.save(document);
+    }
+
+    @Transactional
+    public Document replaceTags(Long documentId, List<String> tags) {
+        Document document = getDocumentById(documentId);
+        document.replaceTags(tags);
         return documents.save(document);
     }
 

@@ -165,8 +165,13 @@ class AuthenticationIntegrationTest {
                         .contentType("application/json").content(json.writeValueAsString(Map.of("categoryIds", List.of(categoryId)))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.categories[0].id").value(categoryId))
                 .andExpect(jsonPath("$.categories[0].name").isString());
+        mvc.perform(put("/api/v1/documents/" + id + "/tags").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content("{\"tags\":[\" Housing \",\"housing\"]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.tags.length()").value(1))
+                .andExpect(jsonPath("$.tags[0]").value("housing"));
         mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].tags[0]").value("housing"));
         String otherToken = login(account(UserRole.ADMIN, false, true));
         mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
@@ -178,6 +183,9 @@ class AuthenticationIntegrationTest {
                         .contentType("application/json").content("{\"title\":\"Stolen\",\"description\":null}"))
                 .andExpect(status().isNotFound());
         mvc.perform(put("/api/v1/documents/" + id + "/categories").contentType("application/json").content("{\"categoryIds\":[]}").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/v1/documents/" + id + "/tags").header("Authorization", "Bearer " + otherToken)
+                        .contentType("application/json").content("{\"tags\":[]}"))
                 .andExpect(status().isNotFound());
         mvc.perform(delete("/api/v1/documents/" + id).header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound());

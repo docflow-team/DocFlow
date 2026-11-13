@@ -22,8 +22,11 @@ class DocumentPersistenceMapperTest {
         type.setName("Invoice");
         type.setDescription("Amount requested");
         entity.getCategories().add(type);
+        entity.getTags().add(new TagEntity("housing"));
         Document document = mapper.toDomain(entity);
         entity.getCategories().clear();
+        entity.getTags().clear();
+        assertEquals(List.of("housing"), document.getTags());
         assertEquals(List.of(new Category(2L, "Invoice", "Amount requested")), document.getCategories());
         assertEquals("Original", document.getTitle());
         assertEquals("original.pdf", document.getOriginalFilename());
@@ -34,12 +37,14 @@ class DocumentPersistenceMapperTest {
     @Test
     void newEntityMappingProtectsGeneratedIdentityTimesAndRelationships() {
         Document incoming = document(99, 7);
+        incoming.replaceTags(List.of("housing"));
         incoming.replaceCategories(List.of(new Category(2L, "Invoice", null)));
         DocumentEntity entity = mapper.toNewEntity(incoming);
         assertNull(entity.getId());
         assertNull(entity.getCreatedAt());
         assertNull(entity.getUpdatedAt());
         assertTrue(entity.getCategories().isEmpty());
+        assertTrue(entity.getTags().isEmpty());
         assertEquals(7L, entity.getOwnerId());
         assertEquals("documents/99.pdf", entity.getObjectKey());
     }
@@ -53,7 +58,10 @@ class DocumentPersistenceMapperTest {
         ReflectionTestUtils.setField(entity, "updatedAt", created);
         var type = new CategoryEntity();
         entity.getCategories().add(type);
+        var tag = new TagEntity("housing");
+        entity.getTags().add(tag);
         Document changes = document(99, 8);
+        changes.replaceTags(List.of("forged"));
         changes.updateMetadata(new Document.Metadata("Renamed", null));
         changes.replaceCategories(List.of(new Category(3L, "Report", null)));
         mapper.updateMetadata(changes, entity);
@@ -65,6 +73,7 @@ class DocumentPersistenceMapperTest {
         assertEquals(created, entity.getCreatedAt());
         assertEquals(created, entity.getUpdatedAt());
         assertEquals(Set.of(type), entity.getCategories());
+        assertEquals(Set.of(tag), entity.getTags());
         assertEquals("Renamed", entity.getTitle());
         assertNull(entity.getDescription());
     }

@@ -40,6 +40,7 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.document.id").value(1))
                 .andExpect(jsonPath("$.document.objectKey").doesNotExist())
                 .andExpect(jsonPath("$.document.ownerId").doesNotExist())
+                .andExpect(jsonPath("$.document.tags").isEmpty())
                 .andExpect(jsonPath("$.processingUrl").value("/api/v1/documents/1/processing"))
                 .andExpect(jsonPath("$.processing.processingAvailable").value(false))
                 .andExpect(jsonPath("$.processing.ocr").value("NOT_STARTED"));
@@ -92,6 +93,23 @@ class DocumentControllerTest {
         verify(documents).replaceCategories(1L, List.of(42L));
         for (String body : List.of("{}", "{\"categoryIds\":null}", "{\"categoryIds\":[null]}", "{\"categoryIds\":[0]}")) {
             mvc.perform(put("/api/v1/documents/1/categories").contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest()).andExpect(content().contentType("application/json"));
+        }
+        verifyNoMoreInteractions(documents);
+    }
+
+    @Test
+    void tagReplacementMapsNamesAndRequiresAnExplicitList() throws Exception {
+        var document = document(1, 7);
+        document.replaceTags(List.of(" Housing "));
+        when(documents.replaceTags(1L, List.of(" Housing "))).thenReturn(document);
+        mvc.perform(put("/api/v1/documents/1/tags").contentType("application/json")
+                        .content("{\"tags\":[\" Housing \"],\"ownerId\":99}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.tags[0]").value("housing"))
+                .andExpect(jsonPath("$.title").value("Original"));
+        verify(documents).replaceTags(1L, List.of(" Housing "));
+        for (String body : List.of("{}", "{\"tags\":null}", "{\"tags\":[null]}")) {
+            mvc.perform(put("/api/v1/documents/1/tags").contentType("application/json").content(body))
                     .andExpect(status().isBadRequest()).andExpect(content().contentType("application/json"));
         }
         verifyNoMoreInteractions(documents);

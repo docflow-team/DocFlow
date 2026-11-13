@@ -151,9 +151,10 @@ Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire 
 | GET | `/api/v1/documents/{id}/processing` | `200`; inactive `NOT_STARTED` stages |
 | GET | `/api/v1/categories` | `200`; name-sorted shared categories |
 | PUT | `/api/v1/documents/{id}/categories` | `200`; replace `{categoryIds: [...]}` |
+| PUT | `/api/v1/documents/{id}/tags` | `200`; replace `{tags: [...]}` |
 | DELETE | `/api/v1/documents/{id}` | `204`; no body |
 
-PDFs must be parseable, unencrypted, nonempty, at most 10 MiB and contain 1-50 pages. Total multipart requests are limited to 12 MiB. Titles are trimmed and required; title/description are limited to 255 characters. Upload returns the document and processing URL; background processing is unavailable. Original files are immutable. Responses and errors use JSON, except successful PDF downloads and empty deletions. See [OpenAPI](contracts/openapi.yaml) for the full contract.
+PDFs must be parseable, unencrypted, nonempty, at most 10 MiB and contain 1-50 pages. Total multipart requests are limited to 12 MiB. Titles are trimmed and required; title/description are limited to 255 characters. Upload returns the document and processing URL; background processing is unavailable. Original files are immutable. Tags are trimmed/lowercased and deduplicated: up to 20 unique tags per document, 1-50 characters each; `[]` clears them. Responses and errors use JSON, except successful PDF downloads and empty deletions. See [OpenAPI](contracts/openapi.yaml) for the full contract.
 
 Runnable examples are in [`tests/http/auth.http`](tests/http/auth.http) and [`tests/http/documents.http`](tests/http/documents.http). The planned target architecture remains documented in [`docs/architecture.md`](docs/architecture.md).
 
