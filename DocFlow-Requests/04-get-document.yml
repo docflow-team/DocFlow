@@ -4,7 +4,7 @@ info:
   seq: 4
 http:
   method: GET
-  url: '{{baseUrl}}/api/documents/{{documentId}}'
+  url: '{{baseUrl}}/api/v1/documents/{{documentId}}'
   headers:
   - name: Authorization
     value: Bearer {{accessToken}}

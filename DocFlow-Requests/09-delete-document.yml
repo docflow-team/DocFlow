@@ -4,7 +4,7 @@ info:
   seq: 9
 http:
   method: DELETE
-  url: '{{baseUrl}}/api/documents/{{documentId}}'
+  url: '{{baseUrl}}/api/v1/documents/{{documentId}}'
   headers:
   - name: Authorization
     value: Bearer {{accessToken}}

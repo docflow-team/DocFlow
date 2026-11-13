@@ -1,17 +1,12 @@
 package at.fhtw.docflow.document.application;
 
 import at.fhtw.docflow.document.domain.Document;
-
-import java.util.List;
+import at.fhtw.docflow.document.application.DocumentService.DocumentPage;
 import java.util.Optional;
 
 public interface DocumentRepository {
-
     Document save(Document document);
-
-    List<Document> findAllByOwnerId(Long ownerId);
-
+    DocumentPage findAllByOwnerId(Long ownerId, int page, int size);
     Optional<Document> findByIdAndOwnerId(Long id, Long ownerId);
-
-    boolean deleteByIdAndOwnerId(Long id, Long ownerId);
+    Optional<Document> deleteByIdAndOwnerId(Long id, Long ownerId);
 }

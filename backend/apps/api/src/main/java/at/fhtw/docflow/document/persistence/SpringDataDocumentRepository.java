@@ -1,13 +1,11 @@
 package at.fhtw.docflow.document.persistence;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
 public interface SpringDataDocumentRepository extends JpaRepository<DocumentEntity, Long> {
-
-    List<DocumentEntity> findAllByOwnerId(Long ownerId);
-    Optional<DocumentEntity> findByIdAndOwnerId(Long id, Long ownerId);
-    long deleteByIdAndOwnerId(Long id, Long ownerId);
+    Page<DocumentEntity> findAllByOwnerIdAndObjectKeyIsNotNull(Long ownerId, Pageable pageable);
+    Optional<DocumentEntity> findByIdAndOwnerIdAndObjectKeyIsNotNull(Long id, Long ownerId);
 }

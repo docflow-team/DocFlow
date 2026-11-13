@@ -1,317 +1,145 @@
 package at.fhtw.docflow.document.api;
 
 import at.fhtw.docflow.api.ApiExceptionHandler;
-import at.fhtw.docflow.document.api.DocumentController.DocumentRequest;
-
-import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.application.DocumentService;
+import at.fhtw.docflow.document.application.DocumentStorage;
+import at.fhtw.docflow.document.domain.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.mapstruct.factory.Mappers;
-
+import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
-
+import java.util.NoSuchElementException;
+import static at.fhtw.docflow.document.DocumentTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class DocumentControllerTest {
-
     private final DocumentMapper mapper = Mappers.getMapper(DocumentMapper.class);
-    private DocumentService documentService;
-    private MockMvc mockMvc;
+    private final DocumentService documents = mock(DocumentService.class);
+    private MockMvc mvc;
 
     @BeforeEach
-    void setUp() {
-        documentService = mock(DocumentService.class);
-
-        DocumentController controller =
-                new DocumentController(documentService, mapper);
-
-        mockMvc = MockMvcBuilders
-                .standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler())
-                .build();
+    void setup() {
+        mvc = MockMvcBuilders.standaloneSetup(new DocumentController(documents, mapper))
+                .setControllerAdvice(new ApiExceptionHandler()).build();
     }
 
     @Test
-    void requestMappingLeavesServerControlledFieldsUnsetAndAllowsNullDescription() {
-        Document document = mapper.toDomain(new DocumentRequest("file.pdf", "application/pdf", null));
-
-        assertNull(document.getId());
-        assertNull(document.getOwnerId());
-        assertNull(document.getCreatedAt());
-        assertTrue(document.getDocumentTypeIds().isEmpty());
-        assertNull(document.getDescription());
+    void uploadReturns202WithTheDocumentAndInactiveProcessingLocation() throws Exception {
+        when(documents.upload(any(), anyString(), anyString(), any())).thenReturn(document(1, 7));
+        mvc.perform(multipart("/api/v1/documents")
+                        .file(new MockMultipartFile("file", "original.pdf", "application/pdf", pdf(1)))
+                        .param("title", " Invoice "))
+                .andExpect(status().isAccepted()).andExpect(header().string("Location", "/api/v1/documents/1/processing"))
+                .andExpect(jsonPath("$.document.id").value(1))
+                .andExpect(jsonPath("$.document.objectKey").doesNotExist())
+                .andExpect(jsonPath("$.document.ownerId").doesNotExist())
+                .andExpect(jsonPath("$.processingUrl").value("/api/v1/documents/1/processing"))
+                .andExpect(jsonPath("$.processing.processingAvailable").value(false))
+                .andExpect(jsonPath("$.processing.ocr").value("NOT_STARTED"));
+        verify(documents).upload(eq(new Document.Metadata("Invoice", null)), eq("original.pdf"), eq("application/pdf"), any());
     }
 
     @Test
-    void getDocumentByIdShouldReturn404WhenNotFound() throws Exception {
-
-        when(documentService.getDocumentById(999L))
-                .thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/api/documents/999"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(404));
-
-        verify(documentService).getDocumentById(999L);
+    void requiredMultipartFieldsAndJsonCreationAreRejected() throws Exception {
+        mvc.perform(multipart("/api/v1/documents").param("title", "Invoice"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.file").exists());
+        mvc.perform(multipart("/api/v1/documents")
+                        .file(new MockMultipartFile("file", "original.pdf", "application/pdf", pdf(1))).param("title", " "))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.title").exists());
+        mvc.perform(post("/api/v1/documents").contentType("application/json").content("{}"))
+                .andExpect(status().isUnsupportedMediaType()).andExpect(content().contentType("application/json"));
+        verifyNoInteractions(documents);
     }
 
     @Test
-    void getDocumentByIdShouldReturn200WhenFound() throws Exception {
-
-        Document document = Document.create(
-                "rechnung.pdf",
-                "application/pdf",
-                "Stromrechnung"
-        );
-
-        when(documentService.getDocumentById(1L))
-                .thenReturn(Optional.of(document));
-
-        mockMvc.perform(get("/api/documents/1"))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.filename").value("rechnung.pdf"))
-                .andExpect(jsonPath("$.contentType").value("application/pdf"))
-                .andExpect(jsonPath("$.description").value("Stromrechnung"));
-
-        verify(documentService).getDocumentById(1L);
+    void listsUseThePageEnvelopeAndSafeDocumentMapping() throws Exception {
+        when(documents.getAllDocuments(0, 20))
+                .thenReturn(new DocumentService.DocumentPage(List.of(document(1, 7)), 0, 20, 1, 1));
+        mvc.perform(get("/api/v1/documents"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].title").value("Original"))
+                .andExpect(jsonPath("$.items[0].objectKey").doesNotExist())
+                .andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.page").value(0));
     }
 
     @Test
-    void getAllDocumentsShouldReturn200() throws Exception {
-
-        Document doc1 = Document.create(
-                "rechnung.pdf", "application/pdf", "Rechnung"
-        );
-
-        Document doc2 = Document.create(
-                "vertrag.pdf", "application/pdf", "Vertrag"
-        );
-
-        when(documentService.getAllDocuments())
-                .thenReturn(List.of(doc1, doc2));
-
-        mockMvc.perform(get("/api/documents"))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].filename").value("rechnung.pdf"))
-                .andExpect(jsonPath("$[1].filename").value("vertrag.pdf"));
-
-        verify(documentService).getAllDocuments();
+    void metadataMappingAcceptsOnlyEditableFieldsAndCanClearDescription() throws Exception {
+        var metadata = mapper.toMetadata(new DocumentController.MetadataRequest(" Renamed ", null));
+        assertEquals(new Document.Metadata("Renamed", null), metadata);
+        when(documents.updateMetadata(1L, metadata)).thenReturn(document(1, 7));
+        mvc.perform(put("/api/v1/documents/1/metadata").contentType("application/json")
+                        .content("{\"title\":\" Renamed \" ,\"description\":null,\"ownerId\":99,\"objectKey\":\"forged\"}"))
+                .andExpect(status().isOk());
+        verify(documents).updateMetadata(1L, metadata);
     }
 
     @Test
-    void createDocumentShouldReturn201() throws Exception {
-
-        Document document = Document.create(
-                "rechnung.pdf", "application/pdf", "Rechnung"
-        );
-
-        when(documentService.createDocument(any(Document.class)))
-                .thenReturn(document);
-
-        String json = """
-            {
-                "filename": "rechnung.pdf",
-                "contentType": "application/pdf",
-                "description": "Rechnung"
-            }
-            """;
-
-        mockMvc.perform(post("/api/documents")
-                        .contentType("application/json")
-                        .content(json))
-                .andExpect(status().isCreated())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.filename").value("rechnung.pdf"))
-                .andExpect(jsonPath("$.description").value("Rechnung"));
-
-        verify(documentService).createDocument(any(Document.class));
+    void metadataValidationAndMalformedJsonReturnSafe400s() throws Exception {
+        mvc.perform(put("/api/v1/documents/1/metadata").contentType("application/json").content("{\"title\":\"\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.title").exists());
+        mvc.perform(put("/api/v1/documents/1/metadata").contentType("application/json").content("{"))
+                .andExpect(status().isBadRequest()).andExpect(content().contentType("application/json"));
+        verifyNoInteractions(documents);
     }
 
     @Test
-    void updateDocumentShouldReturn200() throws Exception {
-
-        Long id = 1L;
-
-        Document updated = Document.create(
-                "neu.pdf", "application/pdf", "Neue Beschreibung"
-        );
-
-        when(documentService.updateDocument(
-                eq(id), any(Document.class)))
-                .thenReturn(Optional.of(updated));
-
-        String json = """
-            {
-                "filename": "neu.pdf",
-                "contentType": "application/pdf",
-                "description": "Neue Beschreibung"
-            }
-            """;
-
-        mockMvc.perform(put("/api/documents/{id}", id)
-                        .contentType("application/json")
-                        .content(json))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.filename").value("neu.pdf"))
-                .andExpect(jsonPath("$.description").value("Neue Beschreibung"));
-
-        verify(documentService).updateDocument(
-                eq(id), any(Document.class));
+    void downloadsArePdfAttachmentsAndPrivateResponsesAreNotCached() throws Exception {
+        byte[] content = pdf(1);
+        when(documents.download(1L)).thenReturn(new DocumentService.Download("original.pdf", content));
+        mvc.perform(get("/api/v1/documents/1/content").accept("application/pdf"))
+                .andExpect(status().isOk()).andExpect(content().contentType("application/pdf"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment;")))
+                .andExpect(content().bytes(content));
     }
 
     @Test
-    void updateDocumentShouldReturn404WhenNotFound() throws Exception {
-
-        Long id = 999L;
-
-        when(documentService.updateDocument(
-                eq(id), any(Document.class)))
-                .thenReturn(Optional.empty());
-
-        String json = """
-            {
-                "filename": "neu.pdf",
-                "contentType": "application/pdf",
-                "description": "Neue Beschreibung"
-            }
-            """;
-
-        mockMvc.perform(put("/api/documents/{id}", id)
-                        .contentType("application/json")
-                        .content(json))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(404));
-
-        verify(documentService).updateDocument(
-                eq(id), any(Document.class));
+    void processingChecksOwnershipAndReportsNoBackgroundWork() throws Exception {
+        when(documents.getDocumentById(1L)).thenReturn(document(1, 7));
+        mvc.perform(get("/api/v1/documents/1/processing"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.processingAvailable").value(false))
+                .andExpect(jsonPath("$.ocr").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.indexing").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.summary").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.classification").value("NOT_STARTED"));
     }
 
     @Test
-    void deleteDocumentShouldReturn204() throws Exception {
-
-        Long id = 1L;
-
-        when(documentService.deleteDocument(id))
-                .thenReturn(true);
-
-        mockMvc.perform(delete("/api/documents/{id}", id))
-                .andExpect(status().isNoContent())
-                .andExpect(content().string(""));
-
-        verify(documentService).deleteDocument(id);
+    void deletionIsEmptyAndMissingResourcesAreSafeJson404s() throws Exception {
+        mvc.perform(delete("/api/v1/documents/1")).andExpect(status().isNoContent()).andExpect(content().string(""));
+        when(documents.getDocumentById(9L)).thenThrow(new NoSuchElementException());
+        when(documents.download(9L)).thenThrow(new NoSuchElementException());
+        mvc.perform(get("/api/v1/documents/9")).andExpect(status().isNotFound()).andExpect(jsonPath("$.status").value(404));
+        mvc.perform(get("/api/v1/documents/9/content").accept("application/pdf"))
+                .andExpect(status().isNotFound()).andExpect(content().contentType("application/json"));
     }
 
     @Test
-    void deleteDocumentShouldReturn404WhenNotFound() throws Exception {
-
-        Long id = 999L;
-
-        when(documentService.deleteDocument(id))
-                .thenReturn(false);
-
-        mockMvc.perform(delete("/api/documents/{id}", id))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(404));
-
-        verify(documentService).deleteDocument(id);
+    void documentAndStorageFailuresUseTheAgreedHttpStatuses() throws Exception {
+        for (var reason : Document.InvalidDocumentException.Reason.values()) {
+            doThrow(new Document.InvalidDocumentException(reason, "Invalid document"))
+                    .when(documents).upload(any(), anyString(), anyString(), any());
+            int expected = switch (reason) { case INVALID -> 400; case TOO_LARGE -> 413; case UNSUPPORTED_TYPE -> 415; };
+            mvc.perform(multipart("/api/v1/documents").file(new MockMultipartFile("file", "file.pdf", "application/pdf", pdf(1)))
+                            .param("title", "File"))
+                    .andExpect(status().is(expected)).andExpect(content().contentType("application/json"));
+        }
+        when(documents.download(1L)).thenThrow(new DocumentStorage.StorageException(new IOException("Private storage details")));
+        mvc.perform(get("/api/v1/documents/1/content"))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.detail").value("Document storage is unavailable"));
     }
 
     @Test
-    void createDocumentShouldReturn400WhenFilenameIsBlank() throws Exception {
-
-        String json = """
-            {
-                "filename": "",
-                "contentType": "application/pdf",
-                "description": "Stromrechnung"
-            }
-            """;
-
-        mockMvc.perform(post("/api/documents")
-                        .contentType("application/json")
-                        .content(json))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(400));
-
-        verify(documentService, never())
-                .createDocument(any(Document.class));
-    }
-
-    @Test
-    void addDocumentTypeShouldReturn200() throws Exception {
-
-        Long documentId = 1L;
-        Long typeId = 2L;
-
-        mockMvc.perform(post(
-                        "/api/documents/{documentId}/types/{typeId}",
-                        documentId,
-                        typeId
-                ))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.documentId").value(documentId))
-                .andExpect(jsonPath("$.typeId").value(typeId));
-
-        verify(documentService)
-                .addDocumentType(documentId, typeId);
-    }
-
-    @Test
-    void addDocumentTypeShouldReturnJson404WhenResourceIsMissing() throws Exception {
-        doThrow(new java.util.NoSuchElementException())
-                .when(documentService).addDocumentType(1L, 999L);
-
-        mockMvc.perform(post("/api/documents/1/types/999"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(404));
-    }
-
-    @Test
-    void malformedJsonShouldReturnJson400() throws Exception {
-        mockMvc.perform(post("/api/documents")
-                        .contentType("application/json")
-                        .content("{"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(400));
-    }
-
-    @Test
-    void nonJsonRequestBodyShouldReturnJson415() throws Exception {
-        mockMvc.perform(post("/api/documents")
-                        .contentType("text/plain")
-                        .content("document"))
-                .andExpect(status().isUnsupportedMediaType())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(415));
-    }
-
-    @Test
-    void unexpectedFailureShouldReturnJsonWithoutInternalDetails() throws Exception {
-        when(documentService.getAllDocuments())
-                .thenThrow(new IllegalStateException("Private database details"));
-
-        mockMvc.perform(get("/api/documents"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.detail").value("An unexpected error occurred"));
+    void unexpectedErrorsDoNotExposeInternalDetailsAndLegacyRoutesAreGone() throws Exception {
+        when(documents.getDocumentById(1L)).thenThrow(new IllegalStateException("Private database details"));
+        mvc.perform(get("/api/v1/documents/1"))
+                .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.detail").value("An unexpected error occurred"));
+        mvc.perform(get("/api/documents")).andExpect(status().isNotFound());
     }
 }

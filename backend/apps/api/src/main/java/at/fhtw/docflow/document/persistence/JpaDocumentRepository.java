@@ -1,23 +1,23 @@
 package at.fhtw.docflow.document.persistence;
 
 import at.fhtw.docflow.document.application.DocumentRepository;
+import at.fhtw.docflow.document.application.DocumentService.DocumentPage;
 import at.fhtw.docflow.document.domain.Document;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Repository
 public class JpaDocumentRepository implements DocumentRepository {
-
     private final SpringDataDocumentRepository documents;
     private final SpringDataDocumentTypeRepository types;
     private final DocumentPersistenceMapper mapper;
 
     public JpaDocumentRepository(SpringDataDocumentRepository documents,
-                                 SpringDataDocumentTypeRepository types,
-                                 DocumentPersistenceMapper mapper) {
+                                 SpringDataDocumentTypeRepository types, DocumentPersistenceMapper mapper) {
         this.documents = documents;
         this.types = types;
         this.mapper = mapper;
@@ -37,18 +37,25 @@ public class JpaDocumentRepository implements DocumentRepository {
         }
         entity.getDocumentTypes().clear();
         entity.getDocumentTypes().addAll(assignedTypes);
-        return mapper.toDomain(documents.save(entity));
+        return mapper.toDomain(documents.saveAndFlush(entity));
     }
 
-    public List<Document> findAllByOwnerId(Long ownerId) {
-        return documents.findAllByOwnerId(ownerId).stream().map(mapper::toDomain).toList();
+    public DocumentPage findAllByOwnerId(Long ownerId, int page, int size) {
+        var result = documents.findAllByOwnerIdAndObjectKeyIsNotNull(ownerId,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id")));
+        return new DocumentPage(result.getContent().stream().map(mapper::toDomain).toList(),
+                result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
     public Optional<Document> findByIdAndOwnerId(Long id, Long ownerId) {
-        return documents.findByIdAndOwnerId(id, ownerId).map(mapper::toDomain);
+        return documents.findByIdAndOwnerIdAndObjectKeyIsNotNull(id, ownerId).map(mapper::toDomain);
     }
 
-    public boolean deleteByIdAndOwnerId(Long id, Long ownerId) {
-        return documents.deleteByIdAndOwnerId(id, ownerId) > 0;
+    public Optional<Document> deleteByIdAndOwnerId(Long id, Long ownerId) {
+        return documents.findByIdAndOwnerIdAndObjectKeyIsNotNull(id, ownerId).map(entity -> {
+            Document document = mapper.toDomain(entity);
+            documents.delete(entity);
+            return document;
+        });
     }
 }

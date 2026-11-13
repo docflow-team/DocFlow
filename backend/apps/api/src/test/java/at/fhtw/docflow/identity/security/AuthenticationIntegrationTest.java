@@ -7,6 +7,8 @@ import at.fhtw.docflow.identity.api.AdminUserController.CreateUserRequest;
 import at.fhtw.docflow.identity.domain.User;
 import at.fhtw.docflow.identity.domain.UserRole;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static at.fhtw.docflow.document.DocumentTestFixtures.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -35,6 +38,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthenticationIntegrationTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     DocumentStorage documentStorage;
+
+    @BeforeEach
+    void storageFixtures() { mockStorage(documentStorage); }
 
     private static final String PASSWORD = " SyntheticPassword ";
     @Autowired MockMvc mvc;
@@ -71,11 +77,11 @@ class AuthenticationIntegrationTest {
     @Test
     void healthIsPublicButDocumentsAndMeRequireBearerAuthentication() throws Exception {
         mvc.perform(get("/api/health")).andExpect(status().isOk());
-        mvc.perform(get("/api/documents")).andExpect(status().isUnauthorized())
+        mvc.perform(get("/api/v1/documents")).andExpect(status().isUnauthorized())
                 .andExpect(content().contentType("application/json")).andExpect(header().string("WWW-Authenticate", "Bearer"))
                 .andExpect(jsonPath("$.status").value(401));
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/documents").header("Authorization", "Basic dGVzdDp0ZXN0"))
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Basic dGVzdDp0ZXN0"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/auth/login").contentType("application/json").content("{}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.login").exists());
@@ -106,7 +112,7 @@ class AuthenticationIntegrationTest {
     void temporaryAccountsMustChangePasswordAndOldTokensAreRevoked() throws Exception {
         User user = account(UserRole.USER, true, true);
         String token = login(user);
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/auth/password").header("Authorization", "Bearer " + token).contentType("application/json")
                         .content(json.writeValueAsString(Map.of("currentPassword", "wrong", "newPassword", "NewPassword"))))
@@ -120,7 +126,7 @@ class AuthenticationIntegrationTest {
         mvc.perform(put("/api/v1/auth/password").header("Authorization", "Bearer " + token).contentType("application/json")
                         .content(json.writeValueAsString(Map.of("currentPassword", PASSWORD, "newPassword", "NewPassword"))))
                 .andExpect(status().isNoContent()).andExpect(content().string(""));
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
         User changed = users.findById(user.id()).orElseThrow();
         assertFalse(changed.mustChangePassword());
         assertEquals(1, changed.tokenVersion());
@@ -141,27 +147,43 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    void ownerScopeIncludesUpdatesDeletesAndAssignmentsAndDoesNotGrantAdminsAccess() throws Exception {
+    void ownerScopeCoversPdfContentMetadataDeletionAssignmentsAndProcessing() throws Exception {
         User owner = account(UserRole.USER, false, true);
         String token = login(owner);
-        var created = mvc.perform(post("/api/documents").header("Authorization", "Bearer " + token)
-                        .contentType("application/json").content("{\"filename\":\"owned.pdf\",\"contentType\":\"application/pdf\"}"))
-                .andExpect(status().isCreated()).andExpect(jsonPath("$.ownerId").doesNotExist()).andReturn();
-        long id = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        byte[] content = pdf(1);
+        var created = mvc.perform(multipart("/api/v1/documents")
+                        .file(new MockMultipartFile("file", "owned.pdf", "application/pdf", content))
+                        .param("title", " Owned ").header("Authorization", "Bearer " + token))
+                .andExpect(status().isAccepted()).andExpect(jsonPath("$.document.ownerId").doesNotExist())
+                .andExpect(jsonPath("$.document.objectKey").doesNotExist())
+                .andExpect(jsonPath("$.document.createdAt").isString()).andReturn();
+        long id = json.readTree(created.getResponse().getContentAsString()).get("document").get("id").asLong();
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
         String otherToken = login(account(UserRole.ADMIN, false, true));
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + otherToken))
-                .andExpect(status().isOk()).andExpect(content().json("[]"));
-        mvc.perform(get("/api/documents/" + id).header("Authorization", "Bearer " + otherToken)).andExpect(status().isNotFound());
-        mvc.perform(put("/api/documents/" + id).header("Authorization", "Bearer " + otherToken).contentType("application/json")
-                        .content("{\"filename\":\"stolen.pdf\",\"contentType\":\"application/pdf\"}"))
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        for (String suffix : List.of("", "/content", "/processing")) {
+            mvc.perform(get("/api/v1/documents/" + id + suffix).header("Authorization", "Bearer " + otherToken))
+                    .andExpect(status().isNotFound());
+        }
+        mvc.perform(put("/api/v1/documents/" + id + "/metadata").header("Authorization", "Bearer " + otherToken)
+                        .contentType("application/json").content("{\"title\":\"Stolen\",\"description\":null}"))
                 .andExpect(status().isNotFound());
-        mvc.perform(post("/api/documents/" + id + "/types/99999").header("Authorization", "Bearer " + otherToken)).andExpect(status().isNotFound());
-        mvc.perform(delete("/api/documents/" + id).header("Authorization", "Bearer " + otherToken)).andExpect(status().isNotFound());
-        mvc.perform(get("/api/documents/" + id).header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.filename").value("owned.pdf"));
-        mvc.perform(delete("/api/documents/" + id).header("Authorization", "Bearer " + token)).andExpect(status().isNoContent());
+        mvc.perform(post("/api/v1/documents/" + id + "/types/99999").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/v1/documents/" + id).header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/documents/" + id + "/content").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(content().contentType("application/pdf")).andExpect(content().bytes(content));
+        mvc.perform(put("/api/v1/documents/" + id + "/metadata").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content("{\"title\":\"Renamed\",\"description\":null,\"ownerId\":999,\"originalFilename\":\"forged.pdf\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.originalFilename").value("owned.pdf"));
+        mvc.perform(get("/api/v1/documents/" + id + "/processing").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.processingAvailable").value(false))
+                .andExpect(jsonPath("$.classification").value("NOT_STARTED"));
+        mvc.perform(delete("/api/v1/documents/" + id).header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -172,7 +194,7 @@ class AuthenticationIntegrationTest {
                         .content("{\"name\":\"Forbidden type\"}"))
                 .andExpect(status().isForbidden());
         users.save(new User(user.id(), user.username(), user.email(), user.passwordHash(), UserRole.USER, false, false, 0));
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
         String admin = login(account(UserRole.ADMIN, false, true));
         mvc.perform(post("/api/document-types").header("Authorization", "Bearer " + admin).contentType("application/json")
                         .content(json.writeValueAsString(Map.of("name", UUID.randomUUID().toString()))))
@@ -186,7 +208,7 @@ class AuthenticationIntegrationTest {
         for (String invalid : List.of(token.substring(0, token.length() - 10) + "aaaaaaaaaa",
                 signed(user, "wrong-issuer", "docflow-api", false), signed(user, "docflow", "wrong-audience", false),
                 signed(user, "docflow", "docflow-api", true))) {
-            mvc.perform(get("/api/documents").header("Authorization", "Bearer " + invalid))
+            mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + invalid))
                     .andExpect(status().isUnauthorized()).andExpect(content().contentType("application/json"));
         }
     }
@@ -229,13 +251,13 @@ class AuthenticationIntegrationTest {
         assertTrue(passwords.matches(PASSWORD, saved.passwordHash()));
 
         String temporaryToken = login(saved.email(), PASSWORD);
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + temporaryToken)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + temporaryToken)).andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/auth/password").header("Authorization", "Bearer " + temporaryToken).contentType("application/json")
                         .content(json.writeValueAsString(Map.of("currentPassword", PASSWORD, "newPassword", "NewSyntheticPassword"))))
                 .andExpect(status().isNoContent());
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + temporaryToken)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + temporaryToken)).andExpect(status().isUnauthorized());
         String changedToken = login(name, "NewSyntheticPassword");
-        mvc.perform(get("/api/documents").header("Authorization", "Bearer " + changedToken)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/documents").header("Authorization", "Bearer " + changedToken)).andExpect(status().isOk());
     }
 
     @Test

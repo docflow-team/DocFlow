@@ -1,21 +1,17 @@
 package at.fhtw.docflow.document.application;
 
 import at.fhtw.docflow.document.domain.Document;
-
 import java.util.List;
-import java.util.Optional;
 
 public interface DocumentService {
-
-    Document createDocument(Document document);
-
-    List<Document> getAllDocuments();
-
-    Optional<Document> getDocumentById(Long id);
-
-    Optional<Document> updateDocument(Long id, Document changes);
-
-    boolean deleteDocument(Long id);
-
+    Document upload(Document.Metadata metadata, String filename, String contentType, byte[] content);
+    DocumentPage getAllDocuments(int page, int size);
+    Document getDocumentById(Long id);
+    Document updateMetadata(Long id, Document.Metadata metadata);
+    Download download(Long id);
+    void deleteDocument(Long id);
     void addDocumentType(Long documentId, Long typeId);
+
+    record DocumentPage(List<Document> items, int page, int size, long totalElements, int totalPages) { }
+    record Download(String originalFilename, byte[] content) { }
 }

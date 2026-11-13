@@ -1,284 +1,175 @@
 package at.fhtw.docflow.document.application;
 
 import at.fhtw.docflow.document.domain.Document;
-import at.fhtw.docflow.document.domain.DocumentType;
-
-import org.junit.jupiter.api.Test;
+import at.fhtw.docflow.document.domain.Document.InvalidDocumentException;
+import at.fhtw.docflow.document.domain.Document.InvalidDocumentException.Reason;
 import org.junit.jupiter.api.BeforeEach;
-import at.fhtw.docflow.identity.application.CurrentUser;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-
+import static at.fhtw.docflow.document.DocumentTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class DocumentServiceTest {
-
-    @Mock
-    private DocumentRepository documentRepository;
-
-    @Mock
-    private DocumentTypeRepository documentTypeRepository;
-
-    @Mock
-    private CurrentUser currentUser;
+    private final DocumentRepository documents = mock(DocumentRepository.class);
+    private final DocumentTypeRepository types = mock(DocumentTypeRepository.class);
+    private final DocumentStorage storage = mock(DocumentStorage.class);
+    private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final DocumentService service = new DefaultDocumentService(documents, types, storage, () -> 1L, transactions);
+    private final Document.Metadata metadata = new Document.Metadata("Invoice", null);
 
     @BeforeEach
-    void currentAccount() { when(currentUser.id()).thenReturn(1L); }
+    void transactionStatus() {
+        when(transactions.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
+    }
 
-    @InjectMocks
-    private DefaultDocumentService documentService;
-
-    @Test
-    void createDocumentShouldSaveDocument() {
-
-        Document document = Document.create(
-                "rechnung.pdf",
-                "application/pdf",
-                "Stromrechnung"
-        );
-
-        when(documentRepository.save(document))
-                .thenReturn(document);
-
-        Document result = documentService.createDocument(document);
-
-        assertSame(document, result);
-        verify(documentRepository).save(document);
+    @ParameterizedTest
+    @ValueSource(ints = {1, 50})
+    void uploadsValidatedPdfUnderTheCurrentOwner(int pages) {
+        when(storage.store(any(), anyLong())).thenReturn("documents/uploaded.pdf");
+        when(documents.save(any())).thenAnswer(call -> call.getArgument(0));
+        byte[] content = pdf(pages);
+        Document result = service.upload(metadata, "C:\\fakepath\\invoice.pdf", "application/pdf", content);
+        assertEquals(1L, result.getOwnerId());
+        assertEquals("invoice.pdf", result.getOriginalFilename());
+        assertEquals(content.length, result.getSizeBytes());
+        assertEquals("documents/uploaded.pdf", result.getObjectKey());
+        var order = inOrder(storage, documents, transactions);
+        order.verify(storage).store(any(), eq((long) content.length));
+        order.verify(documents).save(any());
+        order.verify(transactions).commit(any());
     }
 
     @Test
-    void getAllDocumentsShouldReturnDocuments() {
-        Document doc1 = Document.create(
-                "rechnung.pdf", "application/pdf", "Rechung"
-        );
-
-        Document doc2 = Document.create(
-                "vertrag.pdf", "application/pdf", "Vertrag"
-        );
-
-        List<Document> documents = List.of(doc1, doc2);
-
-        when(documentRepository.findAllByOwnerId(1L)).thenReturn(documents);
-
-        List<Document> result = documentService.getAllDocuments();
-
-        assertEquals(2, result.size());
-        assertEquals(documents, result);
-        verify(documentRepository).findAllByOwnerId(1L);
+    void rejectsEmptyMalformedEncryptedAndOutOfRangePdfsBeforeStorage() {
+        for (byte[] content : List.of(new byte[0], new byte[]{1, 2}, pdf(0), pdf(51), pdf(1, "secret"), pdf(1, ""))) {
+            assertThrows(InvalidDocumentException.class, () -> service.upload(metadata, "file.pdf", "application/pdf", content));
+        }
+        verifyNoInteractions(storage, documents);
     }
 
     @Test
-    void getDocumentByIdShouldReturnDocument() {
-
-        Long id = 1L;
-        Document document = Document.create(
-                "rechung.pdf", "application/pdf", "Rechnung"
-        );
-
-        when(documentRepository.findByIdAndOwnerId(id, 1L))
-                .thenReturn(Optional.of(document));
-
-        Optional<Document> result = documentService.getDocumentById(id);
-
-        assertTrue(result.isPresent());
-        assertSame(document, result.get());
-        verify(documentRepository).findByIdAndOwnerId(id, 1L);
+    void rejectsOversizedFilesAndUnsupportedMediaTypesBeforeStorage() {
+        var size = assertThrows(InvalidDocumentException.class,
+                () -> service.upload(metadata, "file.pdf", "application/pdf", new byte[Document.MAX_PDF_BYTES + 1]));
+        assertEquals(Reason.TOO_LARGE, size.reason());
+        var type = assertThrows(InvalidDocumentException.class,
+                () -> service.upload(metadata, "file.pdf", "text/plain", pdf(1)));
+        assertEquals(Reason.UNSUPPORTED_TYPE, type.reason());
+        verifyNoInteractions(storage, documents);
     }
 
     @Test
-    void getDocumentByIdShouldReturnEmptyWhenNotFound() {
-
-        Long id = 999L;
-
-        when(documentRepository.findByIdAndOwnerId(id, 1L))
-                .thenReturn(Optional.empty());
-
-        Optional<Document> result = documentService.getDocumentById(id);
-
-        assertTrue(result.isEmpty());
-        verify(documentRepository).findByIdAndOwnerId(id, 1L);
+    void aFailedCommitRemovesTheUploadedObject() {
+        when(storage.store(any(), anyLong())).thenReturn("documents/uploaded.pdf");
+        when(documents.save(any())).thenAnswer(call -> call.getArgument(0));
+        doThrow(new TransactionSystemException("Synthetic commit failure")).when(transactions).commit(any());
+        assertThrows(TransactionSystemException.class, () -> service.upload(metadata, "file.pdf", "application/pdf", pdf(1)));
+        verify(storage).delete("documents/uploaded.pdf");
     }
 
     @Test
-    void updateDocumentShouldUpdateMetadata() {
-
-        Long id = 1L;
-
-        Document existing = Document.create(
-                "alt.pdf", "application/pdf", "Alte Beschreibung"
-        );
-
-        Document updated = Document.create(
-                "neu.pdf", "application/pdf", "Neue Beschreibung"
-        );
-
-        when(documentRepository.findByIdAndOwnerId(id, 1L))
-                .thenReturn(Optional.of(existing));
-
-        when(documentRepository.save(existing))
-                .thenReturn(existing);
-
-        Optional<Document> result =
-                documentService.updateDocument(id, updated);
-
-        assertTrue(result.isPresent());
-        assertEquals("neu.pdf", result.get().getFilename());
-        assertEquals("application/pdf", result.get().getContentType());
-        assertEquals("Neue Beschreibung", result.get().getDescription());
-
-        verify(documentRepository).findByIdAndOwnerId(id, 1L);
-        verify(documentRepository).save(existing);
+    void cleanupFailureDoesNotHideTheDatabaseFailure() {
+        when(storage.store(any(), anyLong())).thenReturn("documents/uploaded.pdf");
+        var databaseFailure = new IllegalStateException("Synthetic database failure");
+        when(documents.save(any())).thenThrow(databaseFailure);
+        doThrow(new DocumentStorage.StorageException(new IOException("Synthetic storage failure")))
+                .when(storage).delete("documents/uploaded.pdf");
+        assertSame(databaseFailure, assertThrows(IllegalStateException.class,
+                () -> service.upload(metadata, "file.pdf", "application/pdf", pdf(1))));
+        verify(transactions).rollback(any());
     }
 
     @Test
-    void updateDocumentShouldReturnEmptyWhenNotFound() {
-
-        Long id = 999L;
-
-        Document updated = Document.create(
-                "neu.pdf", "application/pdf", "Beschreibung"
-        );
-
-        when(documentRepository.findByIdAndOwnerId(id, 1L))
-                .thenReturn(Optional.empty());
-
-        Optional<Document> result =
-                documentService.updateDocument(id, updated);
-
-        assertTrue(result.isEmpty());
-
-        verify(documentRepository).findByIdAndOwnerId(id, 1L);
-        verify(documentRepository, never()).save(any(Document.class));
+    void listsAreOwnerScopedAndPaginationIsBounded() {
+        var page = new DocumentService.DocumentPage(List.of(document(1, 1)), 0, 20, 1, 1);
+        when(documents.findAllByOwnerId(1L, 0, 20)).thenReturn(page);
+        assertEquals(page, service.getAllDocuments(0, 20));
+        assertThrows(InvalidDocumentException.class, () -> service.getAllDocuments(-1, 20));
+        assertThrows(InvalidDocumentException.class, () -> service.getAllDocuments(0, 0));
+        assertThrows(InvalidDocumentException.class, () -> service.getAllDocuments(0, 101));
     }
 
     @Test
-    void updateDocumentIgnoresIncomingIdentityTimeAndAssignments() {
-        var createdAt = java.time.LocalDateTime.of(2026, 11, 13, 12, 0);
-        Document existing = new Document(1L, "old.pdf", "application/pdf", "Old", createdAt, java.util.Set.of(2L), null);
-        Document changes = new Document(99L, "new.pdf", "application/pdf", null,
-                createdAt.plusDays(1), java.util.Set.of(3L), null);
-        when(documentRepository.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(existing));
-        when(documentRepository.save(existing)).thenReturn(existing);
-
-        Document result = documentService.updateDocument(1L, changes).orElseThrow();
-
-        assertEquals(1L, result.getId());
-        assertEquals(createdAt, result.getCreatedAt());
-        assertEquals(java.util.Set.of(2L), result.getDocumentTypeIds());
+    void metadataEditsPreserveFileAndServerControlledFields() {
+        Document original = document(1, 1);
+        original.assignDocumentType(2L);
+        when(documents.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(original));
+        when(documents.save(original)).thenReturn(original);
+        Document result = service.updateMetadata(1L, new Document.Metadata("Renamed", null));
+        assertEquals("Renamed", result.getTitle());
         assertNull(result.getDescription());
-        verify(documentRepository).save(existing);
+        assertEquals("documents/1.pdf", result.getObjectKey());
+        assertEquals("original.pdf", result.getOriginalFilename());
+        assertEquals(1L, result.getOwnerId());
+        assertTrue(result.getDocumentTypeIds().contains(2L));
+        verifyNoInteractions(storage);
     }
 
     @Test
-    void deleteDocumentShouldDeleteExistingDocument() {
-
-        Long id = 1L;
-
-        when(documentRepository.deleteByIdAndOwnerId(id, 1L)).thenReturn(true);
-
-        boolean result = documentService.deleteDocument(id);
-
-        assertTrue(result);
-        verify(documentRepository).deleteByIdAndOwnerId(id, 1L);
+    void downloadsAreOwnerScopedAndCloseTheStorageStream() throws Exception {
+        when(documents.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(document(1, 1)));
+        byte[] content = pdf(1);
+        var stream = spy(new ByteArrayInputStream(content));
+        when(storage.read("documents/1.pdf")).thenReturn(stream);
+        var result = service.download(1L);
+        assertArrayEquals(content, result.content());
+        assertEquals("original.pdf", result.originalFilename());
+        verify(stream).close();
     }
 
     @Test
-    void deleteDocumentShouldReturnFalseWhenNotFound() {
-
-        Long id = 999L;
-
-        when(documentRepository.deleteByIdAndOwnerId(id, 1L)).thenReturn(false);
-
-        boolean result = documentService.deleteDocument(id);
-
-        assertFalse(result);
-
-        verify(documentRepository).deleteByIdAndOwnerId(id, 1L);
+    void missingOrForeignDocumentsNeverAccessStorage() {
+        assertThrows(NoSuchElementException.class, () -> service.getDocumentById(7L));
+        assertThrows(NoSuchElementException.class, () -> service.download(7L));
+        assertThrows(NoSuchElementException.class, () -> service.updateMetadata(7L, metadata));
+        assertThrows(NoSuchElementException.class, () -> service.deleteDocument(7L));
+        verifyNoInteractions(storage);
     }
 
     @Test
-    void addDocumentTypeShouldAssignTypeToDocument() {
-
-        Long documentId = 1L;
-        Long typeId = 2L;
-
-        Document document = Document.create(
-                "rechnung.pdf",
-                "application/pdf",
-                "Stromrechnung"
-        );
-
-        DocumentType documentType = DocumentType.create(
-                "Invoice",
-                "Invoice document"
-        );
-
-        when(documentRepository.findByIdAndOwnerId(documentId, 1L))
-                .thenReturn(Optional.of(document));
-
-        when(documentTypeRepository.findById(typeId))
-                .thenReturn(Optional.of(documentType));
-
-        documentService.addDocumentType(documentId, typeId);
-
-        assertTrue(document.getDocumentTypeIds().contains(typeId));
-
-        verify(documentRepository).save(document);
+    void objectDeletionRunsAfterTheDatabaseCommit() {
+        when(documents.deleteByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(document(1, 1)));
+        service.deleteDocument(1L);
+        var order = inOrder(documents, transactions, storage);
+        order.verify(documents).deleteByIdAndOwnerId(1L, 1L);
+        order.verify(transactions).commit(any());
+        order.verify(storage).delete("documents/1.pdf");
     }
 
     @Test
-    void addDocumentTypeShouldThrowWhenDocumentNotFound() {
-
-        Long documentId = 999L;
-        Long typeId = 2L;
-
-        when(documentRepository.findByIdAndOwnerId(documentId, 1L))
-                .thenReturn(Optional.empty());
-
-        assertThrows(
-                NoSuchElementException.class,
-                () -> documentService.addDocumentType(documentId, typeId)
-        );
-
-        verify(documentRepository, never())
-                .save(any(Document.class));
+    void failedDatabaseDeletionDoesNotDeleteTheObject() {
+        when(documents.deleteByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(document(1, 1)));
+        doThrow(new TransactionSystemException("Synthetic commit failure")).when(transactions).commit(any());
+        assertThrows(TransactionSystemException.class, () -> service.deleteDocument(1L));
+        verifyNoInteractions(storage);
     }
 
     @Test
-    void addDocumentTypeShouldThrowWhenTypeNotFound() {
-
-        Long documentId = 1L;
-        Long typeId = 999L;
-
-        Document document = Document.create(
-                "rechnung.pdf",
-                "application/pdf",
-                "Stromrechnung"
-        );
-
-        when(documentRepository.findByIdAndOwnerId(documentId, 1L))
-                .thenReturn(Optional.of(document));
-
-        when(documentTypeRepository.findById(typeId))
-                .thenReturn(Optional.empty());
-
-        assertThrows(
-                NoSuchElementException.class,
-                () -> documentService.addDocumentType(documentId, typeId)
-        );
-
-        assertTrue(document.getDocumentTypeIds().isEmpty());
-
-        verify(documentRepository, never())
-                .save(any(Document.class));
+    void storageCleanupFailureLeavesDeletionSuccessfulForManualRecovery() {
+        when(documents.deleteByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(document(1, 1)));
+        doThrow(new DocumentStorage.StorageException(new IOException("Synthetic storage failure")))
+                .when(storage).delete("documents/1.pdf");
+        assertDoesNotThrow(() -> service.deleteDocument(1L));
     }
 
+    @Test
+    void assignmentRequiresAnOwnedDocumentAndAnExistingType() {
+        Document original = document(1, 1);
+        when(documents.findByIdAndOwnerId(1L, 1L)).thenReturn(Optional.of(original));
+        when(types.findById(2L)).thenReturn(Optional.of(new at.fhtw.docflow.document.domain.DocumentType(2L, "Invoice", null)));
+        service.addDocumentType(1L, 2L);
+        assertTrue(original.getDocumentTypeIds().contains(2L));
+        assertThrows(NoSuchElementException.class, () -> service.addDocumentType(1L, 9L));
+        assertThrows(NoSuchElementException.class, () -> service.addDocumentType(9L, 2L));
+    }
 }

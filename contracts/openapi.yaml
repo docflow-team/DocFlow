@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: DocFlow API
-  version: sprint-2-task-6
-  description: Account creation, authentication and owner-scoped metadata. PDF upload and category replacement
-    are not implemented yet.
+  version: sprint-2-task-8
+  description: Authentication, account creation and owner-only PDF management. Background
+    processing is unavailable.
 servers:
 - url: /
 security:
@@ -134,190 +134,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PasswordChangeRequest'
-  /api/documents:
-    post:
-      summary: Create owner-scoped metadata
-      responses:
-        '201':
-          description: Create owner-scoped metadata
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentResponse'
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '415':
-          description: Unsupported media type
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '401':
-          description: Invalid login or token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '403':
-          description: Role or temporary-password restriction
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-      description: Temporary JSON endpoint until PDF storage is implemented; owner
-        is assigned server-side.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DocumentRequest'
-    get:
-      summary: List own metadata
-      responses:
-        '200':
-          description: List own metadata
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DocumentResponse'
-        '401':
-          description: Invalid login or token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '403':
-          description: Role or temporary-password restriction
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-      description: Unpaginated until the document upload/listing feature lands. Legacy
-        records without owners are hidden.
-  /api/documents/{id}:
-    get:
-      summary: Read own metadata
-      responses:
-        '200':
-          description: Read own metadata
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentResponse'
-        '401':
-          description: Invalid login or token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '403':
-          description: Role or temporary-password restriction
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '404':
-          description: Missing or not owned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-    put:
-      summary: Replace own editable metadata
-      responses:
-        '200':
-          description: Replace own editable metadata
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentResponse'
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '415':
-          description: Unsupported media type
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '401':
-          description: Invalid login or token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '403':
-          description: Role or temporary-password restriction
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '404':
-          description: Missing or not owned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DocumentRequest'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-    delete:
-      summary: Delete own metadata
-      responses:
-        '204':
-          description: Delete own metadata
-        '401':
-          description: Invalid login or token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '403':
-          description: Role or temporary-password restriction
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-        '404':
-          description: Missing or not owned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetail'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
   /api/document-types:
     get:
       summary: List shared document types
@@ -381,7 +197,63 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DocumentTypeRequest'
-  /api/documents/{documentId}/types/{typeId}:
+  /api/v1/admin/users:
+    post:
+      summary: Create an account (ADMIN only)
+      description: Requires an enabled administrator who has changed their temporary
+        password. Creates an enabled USER or ADMIN with mustChangePassword=true. Identifiers
+        are trimmed/lowercased; passwords are never normalized.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Created account; password change required before document access
+          headers:
+            Location:
+              description: Identifier URI of the created account
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid identifiers, role or temporary password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Administrator access or password change required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Username/email already exists or a database constraint prevents
+            creation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/documents/{documentId}/types/{typeId}:
     post:
       summary: Assign type to own document
       responses:
@@ -422,55 +294,287 @@ paths:
         schema:
           type: integer
           format: int64
-  /api/v1/admin/users:
+  /api/v1/documents:
     post:
-      summary: Create an account (ADMIN only)
-      description: Requires an enabled administrator who has changed their temporary password. Creates an enabled USER or ADMIN with mustChangePassword=true. Identifiers are trimmed/lowercased; passwords are never normalized.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateUserRequest'
+      summary: Upload an unencrypted PDF containing 1-50 pages
       responses:
-        '201':
-          description: Created account; password change required before document access
-          headers:
-            Location:
-              description: Identifier URI of the created account
-              schema:
-                type: string
-                format: uri-reference
+        '202':
+          description: Upload an unencrypted PDF containing 1-50 pages
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: '#/components/schemas/UploadResponse'
+          headers:
+            Location:
+              description: Relative processing-status URL
+              schema:
+                type: string
         '400':
-          description: Invalid identifiers, role or temporary password
+          description: Invalid request or PDF
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
         '401':
-          description: Missing or invalid bearer token
+          description: Invalid or missing token
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
         '403':
-          description: Administrator access or password change required
+          description: Temporary-password restriction
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
-        '409':
-          description: Username/email already exists or a database constraint prevents creation
+        '413':
+          description: PDF exceeds 10 MiB or multipart request exceeds 12 MiB
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
         '415':
           description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: Document storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      description: Stores synchronously; 202 does not indicate queued work. All processing
+        stages are NOT_STARTED.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+            encoding:
+              file:
+                contentType: application/pdf
+    get:
+      summary: List own PDFs, newest first with ID as tie-breaker
+      responses:
+        '200':
+          description: List own PDFs, newest first with ID as tie-breaker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPageResponse'
+        '400':
+          description: Invalid request or PDF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+  /api/v1/documents/{id}:
+    parameters:
+    - &id001
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    get:
+      summary: Read own PDF metadata
+      responses:
+        '200':
+          description: Read own PDF metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Document not found for this owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+    delete:
+      summary: Delete own PDF and metadata
+      responses:
+        '204':
+          description: Delete own PDF and metadata
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Document not found for this owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/documents/{id}/metadata:
+    parameters:
+    - *id001
+    put:
+      summary: Replace title and description
+      responses:
+        '200':
+          description: Replace title and description
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          description: Invalid request or PDF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Document not found for this owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataRequest'
+  /api/v1/documents/{id}/content:
+    parameters:
+    - *id001
+    get:
+      summary: Download own PDF attachment
+      responses:
+        '200':
+          description: Download own PDF attachment
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: attachment with original basename
+            Cache-Control:
+              schema:
+                const: no-store
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Document not found for this owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: Document storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/documents/{id}/processing:
+    parameters:
+    - *id001
+    get:
+      summary: Read inactive processing status
+      responses:
+        '200':
+          description: Read inactive processing status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingResponse'
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Temporary-password restriction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Document not found for this owner
           content:
             application/json:
               schema:
@@ -492,10 +596,12 @@ components:
       properties:
         username:
           type: string
-          description: 3-50 letters, digits, dots, underscores or hyphens after trimming; stored lowercase
+          description: 3-50 letters, digits, dots, underscores or hyphens after trimming;
+            stored lowercase
         email:
           type: string
-          description: Valid email, at most 254 characters after trimming; stored lowercase
+          description: Valid email, at most 254 characters after trimming; stored
+            lowercase
         role:
           type: string
           enum:
@@ -563,42 +669,47 @@ components:
           const: 900
         user:
           $ref: '#/components/schemas/UserResponse'
-    DocumentRequest:
-      type: object
-      properties:
-        filename:
-          type: string
-          minLength: 1
-          maxLength: 255
-        contentType:
-          type: string
-          minLength: 1
-          maxLength: 255
-        description:
-          type:
-          - string
-          - 'null'
-          maxLength: 255
-      required:
-      - filename
-      - contentType
     DocumentResponse:
       type: object
+      required:
+      - id
+      - title
+      - originalFilename
+      - contentType
+      - sizeBytes
+      - createdAt
+      - updatedAt
       properties:
         id:
           type: integer
           format: int64
-        filename:
+        title: &id002
           type: string
-        contentType:
-          type: string
-        description:
+          minLength: 1
+          maxLength: 255
+          description: Trimmed; must not be blank
+        description: &id003
           type:
           - string
           - 'null'
+          maxLength: 255
+        originalFilename:
+          type: string
+          maxLength: 255
+        contentType:
+          const: application/pdf
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 10485760
         createdAt:
           type: string
           format: date-time
+          description: UTC
+        updatedAt:
+          type: string
+          format: date-time
+          description: UTC
     DocumentTypeRequest:
       type: object
       properties:
@@ -653,3 +764,84 @@ components:
           type: object
           additionalProperties:
             type: string
+    MetadataRequest:
+      type: object
+      required:
+      - title
+      properties:
+        title: *id002
+        description: *id003
+    UploadRequest:
+      type: object
+      required:
+      - file
+      - title
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Nonempty, parseable, unencrypted application/pdf; at most 10485760
+            bytes and 1-50 pages
+        title: *id002
+        description: *id003
+    DocumentPageResponse:
+      type: object
+      required:
+      - items
+      - page
+      - size
+      - totalElements
+      - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 0
+        totalElements:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    ProcessingResponse:
+      type: object
+      required:
+      - documentId
+      - processingAvailable
+      - ocr
+      - indexing
+      - summary
+      - classification
+      properties:
+        documentId:
+          type: integer
+          format: int64
+        processingAvailable:
+          const: false
+        ocr:
+          const: NOT_STARTED
+        indexing:
+          const: NOT_STARTED
+        summary:
+          const: NOT_STARTED
+        classification:
+          const: NOT_STARTED
+    UploadResponse:
+      type: object
+      required:
+      - document
+      - processingUrl
+      - processing
+      properties:
+        document:
+          $ref: '#/components/schemas/DocumentResponse'
+        processingUrl:
+          type: string
+        processing:
+          $ref: '#/components/schemas/ProcessingResponse'

@@ -4,7 +4,7 @@ info:
   seq: 8
 http:
   method: POST
-  url: '{{baseUrl}}/api/documents/{{documentId}}/types/{{typeId}}'
+  url: '{{baseUrl}}/api/v1/documents/{{documentId}}/types/{{typeId}}'
   headers:
   - name: Authorization
     value: Bearer {{accessToken}}

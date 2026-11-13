@@ -8,24 +8,30 @@ import org.mapstruct.MappingTarget;
 
 @Mapper(config = MappingConfig.class)
 public interface DocumentPersistenceMapper {
-
+    @Mapping(target = "metadata", source = ".")
     @Mapping(target = "documentTypeIds", source = "documentTypes")
     Document toDomain(DocumentEntity entity);
 
-    // Hibernate generates identity/time; the adapter resolves shared type references.
+    Document.Metadata toMetadata(DocumentEntity entity);
+
+    // Persistence generates identity/timestamps; the adapter resolves shared types.
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "documentTypes", ignore = true)
     DocumentEntity toNewEntity(Document document);
 
-    // Metadata changes preserve identity, creation time and existing assignments.
+    // Only title and description change; file identity, ownership, timestamps and assignments are protected.
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "documentTypes", ignore = true)
     @Mapping(target = "ownerId", ignore = true)
+    @Mapping(target = "originalFilename", ignore = true)
+    @Mapping(target = "contentType", ignore = true)
+    @Mapping(target = "objectKey", ignore = true)
+    @Mapping(target = "sizeBytes", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "documentTypes", ignore = true)
     void updateMetadata(Document document, @MappingTarget DocumentEntity entity);
 
-    default Long toTypeId(DocumentTypeEntity entity) {
-        return entity.getId();
-    }
+    default Long toTypeId(DocumentTypeEntity entity) { return entity.getId(); }
 }

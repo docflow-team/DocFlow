@@ -5,6 +5,8 @@ import java.util.Map;
 import at.fhtw.docflow.identity.application.AuthenticationService.InvalidLoginException;
 import at.fhtw.docflow.identity.application.AuthenticationService.InvalidPasswordException;
 import at.fhtw.docflow.identity.application.AuthenticationService.InvalidAccountException;
+import at.fhtw.docflow.document.domain.Document.InvalidDocumentException;
+import at.fhtw.docflow.document.application.DocumentStorage.StorageException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +64,31 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "Document or document type not found");
         return handleExceptionInternal(exception, problem, new HttpHeaders(), HttpStatus.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(InvalidDocumentException.class)
+    public ResponseEntity<Object> handleInvalidDocument(InvalidDocumentException exception, WebRequest request) {
+        HttpStatus status = switch (exception.reason()) {
+            case TOO_LARGE -> HttpStatus.CONTENT_TOO_LARGE;
+            case UNSUPPORTED_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+            case INVALID -> HttpStatus.BAD_REQUEST;
+        };
+        var problem = ProblemDetail.forStatusAndDetail(status, exception.getMessage());
+        return handleExceptionInternal(exception, problem, new HttpHeaders(), status, request);
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<Object> handleStorageFailure(StorageException exception, WebRequest request) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Document storage is unavailable");
+        return handleExceptionInternal(exception, problem, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, "PDF must not exceed 10 MiB; multipart requests must not exceed 12 MiB");
+        return handleExceptionInternal(exception, problem, headers, HttpStatus.CONTENT_TOO_LARGE, request);
     }
 
     // Database constraints enforce unique identifiers, including competing creates.

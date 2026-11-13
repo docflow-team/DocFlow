@@ -1,6 +1,6 @@
 # DocFlow architecture
 
-This document records the intended architecture and agreed course requirements, not implementation progress. Keep the design learning-focused rather than production-ready. See the [sprint summary](sprint-summary.md) for delivered functionality and verification, the [Sprint 2 tracker](sprint-2-progress.md) for task progress, and [README](../README.md) for verified usage commands.
+This document records the intended architecture and agreed course requirements, not implementation progress. Keep the design learning-focused rather than production-ready. See the [sprint summary](sprint-summary.md) for delivered functionality and verification and [README](../README.md) for verified usage commands.
 
 ## 1. Confirmed choices
 
@@ -210,7 +210,7 @@ Document permissions, pagination, upload limits, concurrency conflicts and error
 
 ### Sprint 2 contract decisions
 
-Sprint 2 is a focused local document-management increment, revised on 13 November 2026. A user can log in and manage their own PDFs through React/Nginx, including metadata, tags and manual categories. Docker Compose must run the complete workflow without cloud or AI accounts. The [Sprint 2 tracker](sprint-2-progress.md) lists the implementation checkpoints.
+Sprint 2 is a focused local document-management increment, revised on 13 November 2026. A user can log in and manage their own PDFs through React/Nginx, including metadata, tags and manual categories. Docker Compose must run the complete workflow without cloud or AI accounts.
 
 Keep the completed module structure, required layers/interfaces, MapStruct, user persistence and explicit admin bootstrap. Add modules and dependencies only when their feature needs them. The whole-project API above includes later work; the following is the Sprint 2 subset.
 
@@ -259,6 +259,8 @@ Use complete PUT representations and ordinary transactions. Validate a replaceme
 
 Store PDF bytes in MinIO and metadata in PostgreSQL. On failed metadata persistence, attempt object cleanup. Delete metadata/owned rows transactionally, then attempt object deletion. Log failed cleanup for manual recovery; no distributed transaction or cleanup framework. Preserve required layers and meaningful tests. Verify the core workflow against PostgreSQL/MinIO and enforce the course's coverage requirement above 70%; 80% remains a target.
 
+Validation and downloads hold at most the accepted 10 MiB PDF in memory. The application uses explicit database transaction boundaries for upload and deletion so cleanup follows the actual commit outcome. Metadata-only legacy rows remain stored but are excluded from PDF queries when their object key is absent; the existing physical `filename` column is retained. New timestamps use UTC instants; a JPA callback maintains the update timestamp without requiring one on legacy rows.
+
 #### Deferred work
 
 - Account listing/editing/disabling/reset endpoints and administration screens: later account-management increment. Add last-active-admin protection when demotion/disabling becomes possible.
@@ -278,7 +280,7 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | MapStruct | 1.6.3 library and annotation processor in `backend/apps/api/pom.xml` |
 | Spring Security / JWT | Boot-managed security and OAuth2 resource-server starters with JOSE support |
 | springdoc | Planned candidate: 3.1.1; not installed |
-| PDFBox | Planned candidate: 3.0.8; not installed |
+| PDFBox | 3.0.8 in `backend/apps/api/pom.xml` |
 | MinIO SDK / OkHttp JVM | 9.0.3 / 5.3.2 in `backend/apps/api/pom.xml` |
 | JaCoCo | Planned candidate: 0.8.14 with a coverage gate above 70% and an 80% target; not configured |
 | PostgreSQL | Compose: 18.6; planned disposable tests: 18.3 Alpine (not configured) |
@@ -298,7 +300,7 @@ When implementing the frontend, use Node.js 24 LTS, React 19, TypeScript and Vit
 - `frontend/`: React/PWA application. Group by feature, extracting shared API/components only for real reuse. Maven builds Java; npm builds React.
 - `infra/`: PostgreSQL namespace provisioning and the MinIO source Dockerfile; Nginx, RabbitMQ, Elasticsearch, Logstash and Kibana configuration arrive with their features.
 - `contracts/`: exported OpenAPI and later versioned event schemas and XML XSD. `tests/`: HTTP examples and later end-to-end fixtures/scenarios.
-- `docs/`: architecture here, task progress in `sprint-2-progress.md`, delivered functionality/verification in the sprint summary, setup/usage in README. Add other documents/scripts only when they have a concrete purpose.
+- `docs/`: architecture here, delivered functionality/verification in the sprint summary, setup/usage in README. Add other documents/scripts only when they have a concrete purpose.
 
 This describes responsibilities, not mandatory empty folders. Keep course downloads, local settings, secrets, uploaded files, caches and build output outside Git.
 

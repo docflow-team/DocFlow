@@ -1,95 +1,99 @@
 package at.fhtw.docflow.document.api;
 
-import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.application.DocumentService;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.time.LocalDateTime;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/documents", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/api/v1/documents", produces = MediaType.APPLICATION_JSON_VALUE)
 public class DocumentController {
-
-    private final DocumentService documentService;
+    private final DocumentService documents;
     private final DocumentMapper mapper;
 
-    public DocumentController(DocumentService documentService, DocumentMapper mapper) {
-        this.documentService = documentService;
+    public DocumentController(DocumentService documents, DocumentMapper mapper) {
+        this.documents = documents;
         this.mapper = mapper;
     }
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    public DocumentResponse createDocument(@Valid @RequestBody DocumentRequest request) {
-        Document document = mapper.toDomain(request);
-
-        Document savedDocument = documentService.createDocument(document);
-
-        return mapper.toResponse(savedDocument);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UploadResponse> upload(@Valid @ModelAttribute UploadRequest request) throws IOException {
+        var file = request.file();
+        var document = documents.upload(mapper.toMetadata(request), file.getOriginalFilename(),
+                file.getContentType(), file.getBytes());
+        String processingUrl = "/api/v1/documents/" + document.getId() + "/processing";
+        return ResponseEntity.accepted().location(URI.create(processingUrl))
+                .body(new UploadResponse(mapper.toResponse(document), processingUrl, notStarted(document.getId())));
     }
 
     @GetMapping
-    public List<DocumentResponse> getAllDocuments() {
-        return documentService.getAllDocuments()
-                .stream()
-                .map(mapper::toResponse)
-                .toList();
+    public DocumentPageResponse getAllDocuments(@RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "20") int size) {
+        return mapper.toResponse(documents.getAllDocuments(page, size));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DocumentResponse> getDocumentById(@PathVariable Long id) {
-        return documentService.getDocumentById(id)
-                .map(mapper::toResponse)
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+    public DocumentResponse getDocumentById(@PathVariable Long id) {
+        return mapper.toResponse(documents.getDocumentById(id));
     }
 
-    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<DocumentResponse> updateDocument(
-            @PathVariable Long id,
-            @Valid @RequestBody DocumentRequest request) {
+    @PutMapping(value = "/{id}/metadata", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public DocumentResponse updateMetadata(@PathVariable Long id, @Valid @RequestBody MetadataRequest request) {
+        return mapper.toResponse(documents.updateMetadata(id, mapper.toMetadata(request)));
+    }
 
-        Document updatedDocument = mapper.toDomain(request);
+    @GetMapping(value = "/{id}/content", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> download(@PathVariable Long id) {
+        var content = documents.download(id);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(content.originalFilename(), StandardCharsets.UTF_8).build().toString())
+                .body(content.content());
+    }
 
-        return documentService.updateDocument(id, updatedDocument)
-                .map(mapper::toResponse)
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+    @GetMapping("/{id}/processing")
+    public ProcessingResponse processing(@PathVariable Long id) {
+        return notStarted(documents.getDocumentById(id).getId());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDocument(@PathVariable Long id) {
-        if (documentService.deleteDocument(id)) {
-            return ResponseEntity.noContent().build();
-        }
-
-        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found");
+        documents.deleteDocument(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{documentId}/types/{typeId}")
-    public DocumentTypeAssignmentResponse addDocumentType(
-            @PathVariable Long documentId,
-            @PathVariable Long typeId) {
-
-        documentService.addDocumentType(documentId, typeId);
+    public DocumentTypeAssignmentResponse addDocumentType(@PathVariable Long documentId, @PathVariable Long typeId) {
+        documents.addDocumentType(documentId, typeId);
         return new DocumentTypeAssignmentResponse(documentId, typeId);
     }
 
-    public record DocumentRequest(@NotBlank @Size(max = 255) String filename,
-                                  @NotBlank @Size(max = 255) String contentType,
-                                  @Size(max = 255) String description) { }
+    private static ProcessingResponse notStarted(Long id) {
+        return new ProcessingResponse(id, false, "NOT_STARTED", "NOT_STARTED", "NOT_STARTED", "NOT_STARTED");
+    }
 
-    public record DocumentResponse(Long id, String filename, String contentType,
-                                   String description, LocalDateTime createdAt) { }
-
+    public record UploadRequest(@NotNull MultipartFile file, @NotBlank String title,
+                                @Size(max = 255) String description) { }
+    public record MetadataRequest(@NotBlank String title, @Size(max = 255) String description) { }
+    public record DocumentResponse(Long id, String title, String description, String originalFilename,
+                                   String contentType, long sizeBytes, Instant createdAt, Instant updatedAt) { }
+    public record UploadResponse(DocumentResponse document, String processingUrl, ProcessingResponse processing) { }
+    public record ProcessingResponse(Long documentId, boolean processingAvailable, String ocr, String indexing,
+                                     String summary, String classification) { }
+    public record DocumentPageResponse(List<DocumentResponse> items, int page, int size,
+                                       long totalElements, int totalPages) { }
     public record DocumentTypeAssignmentResponse(Long documentId, Long typeId) { }
 }

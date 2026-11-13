@@ -2,35 +2,46 @@
 @documentId = 1
 @accessToken = paste-your-current-token
 
-### Create metadata (setup operation; no PDF bytes are uploaded)
-POST {{baseUrl}}/api/documents
+### Upload PDF; captures no background work (202, NOT_STARTED)
+POST {{baseUrl}}/api/v1/documents
 Authorization: Bearer {{accessToken}}
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=DocFlowBoundary
 
-{"filename":"invoice.pdf","contentType":"application/pdf","description":"Example"}
+--DocFlowBoundary
+Content-Disposition: form-data; name="title"
 
-### List metadata
-GET {{baseUrl}}/api/documents
+Sample invoice
+--DocFlowBoundary
+Content-Disposition: form-data; name="file"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ../fixtures/sample.pdf
+--DocFlowBoundary--
+
+### List own PDFs
+GET {{baseUrl}}/api/v1/documents?page=0&size=20
 Authorization: Bearer {{accessToken}}
 
-### Get metadata (replace documentId with the returned ID)
-GET {{baseUrl}}/api/documents/{{documentId}}
+### Read metadata
+GET {{baseUrl}}/api/v1/documents/{{documentId}}
 Authorization: Bearer {{accessToken}}
 
 ### Replace editable metadata; null clears description
-PUT {{baseUrl}}/api/documents/{{documentId}}
+PUT {{baseUrl}}/api/v1/documents/{{documentId}}/metadata
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
-{"filename":"renamed.pdf","contentType":"application/pdf","description":null}
+{"title":"Renamed invoice","description":null}
 
-### Validation problem
-PUT {{baseUrl}}/api/documents/{{documentId}}
+### Download PDF
+GET {{baseUrl}}/api/v1/documents/{{documentId}}/content
 Authorization: Bearer {{accessToken}}
-Content-Type: application/json
+Accept: application/pdf
 
-{"filename":"","contentType":"application/pdf"}
+### Read inactive processing status
+GET {{baseUrl}}/api/v1/documents/{{documentId}}/processing
+Authorization: Bearer {{accessToken}}
 
-### Delete metadata
-DELETE {{baseUrl}}/api/documents/{{documentId}}
+### Delete PDF and metadata
+DELETE {{baseUrl}}/api/v1/documents/{{documentId}}
 Authorization: Bearer {{accessToken}}

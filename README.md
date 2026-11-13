@@ -45,7 +45,7 @@ The first MinIO build downloads and compiles its pinned source inside Docker, wh
 With the default ports, the endpoints are:
 
 - Health: `http://localhost:8080/api/health`
-- Documents: `http://localhost:8080/api/documents`
+- Documents: `http://localhost:8080/api/v1/documents`
 - MinIO console: `http://localhost:9001` (credentials from `.env`)
 
 Follow the backend logs with:
@@ -130,7 +130,7 @@ For direct Java startup, provision the `api` schema using the Compose command ab
 
 ## Current API
 
-Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire after 15 minutes; logout/password change revokes existing tokens. Documents belong to the logged-in user; another owner's records return `404`. Older metadata without an owner is hidden.
+Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire after 15 minutes; logout/password change revokes existing tokens. Documents belong to the logged-in user; another owner's records return `404`. Existing metadata-only rows without stored PDFs are hidden.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -143,18 +143,15 @@ Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire 
 | Method | Route | Success |
 | --- | --- | --- |
 | GET | `/api/health` | `200` |
-| POST | `/api/documents` | `201` |
-| GET | `/api/documents` | `200` |
-| GET | `/api/documents/{id}` | `200` or `404` |
-| PUT | `/api/documents/{id}` | `200` or `404` |
-| DELETE | `/api/documents/{id}` | `204` or `404` |
+| POST | `/api/v1/documents` | `202`; multipart `file`, `title`, optional `description` |
+| GET | `/api/v1/documents?page=0&size=20` | `200`; paginated own PDFs |
+| GET | `/api/v1/documents/{id}` | `200`; metadata |
+| PUT | `/api/v1/documents/{id}/metadata` | `200`; replace `{title, description}` |
+| GET | `/api/v1/documents/{id}/content` | `200`; PDF attachment |
+| GET | `/api/v1/documents/{id}/processing` | `200`; inactive `NOT_STARTED` stages |
+| DELETE | `/api/v1/documents/{id}` | `204`; no body |
 
-All response bodies use `Content-Type: application/json`, including errors. Health returns
-`{"status":"UP","message":"DocFlow REST Server is running!"}`. Type assignment returns
-`{"documentId":1,"typeId":1}` with the requested IDs. Successful deletion returns
-`204 No Content` with no body or content type.
-
-Document POST and PUT accept JSON containing required `filename` and `contentType` values and an optional `description`. Each field is limited to 255 characters.
+PDFs must be parseable, unencrypted, nonempty, at most 10 MiB and contain 1-50 pages. Total multipart requests are limited to 12 MiB. Titles are trimmed and required; title/description are limited to 255 characters. Upload returns the document and processing URL; background processing is unavailable. Original files are immutable. Responses and errors use JSON, except successful PDF downloads and empty deletions. See [OpenAPI](contracts/openapi.yaml) for the full contract.
 
 Runnable examples are in [`tests/http/auth.http`](tests/http/auth.http) and [`tests/http/documents.http`](tests/http/documents.http). The planned target architecture remains documented in [`docs/architecture.md`](docs/architecture.md).
 
@@ -165,7 +162,7 @@ The collection uses [OpenCollection YAML](https://docs.usebruno.com/opencollecti
 and contains one request per implemented endpoint operation (including authentication).
 Start the Docker Compose stack as described above, then send the endpoint requests as needed.
 Set `baseUrl`, `documentId` and `typeId` in the environment for your local data.
-Run Login with your local credentials first; it captures the token as a runtime variable. After changing a temporary password, log in again. Create requests capture returned IDs automatically.
+Run Login with your local credentials first; it captures the token as a runtime variable. After changing a temporary password, log in again. Upload and create requests capture returned IDs automatically. The upload example uses [sample.pdf](tests/fixtures/sample.pdf); select your own PDF if needed.
 Document type creation requires ADMIN. Names must be unique; change the example name if it already exists.
 
 Requests use the current `/api/...` controller routes; the exported `contracts/openapi.yaml`

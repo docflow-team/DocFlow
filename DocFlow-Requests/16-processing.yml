@@ -1,0 +1,12 @@
+info:
+  name: Read processing status
+  type: http
+  seq: 16
+http:
+  method: GET
+  url: '{{baseUrl}}/api/v1/documents/{{documentId}}/processing'
+  headers:
+  - name: Authorization
+    value: Bearer {{accessToken}}
+  - name: Accept
+    value: application/json

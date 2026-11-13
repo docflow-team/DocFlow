@@ -1,27 +1,32 @@
 info:
-  name: Create document metadata
+  name: Upload PDF
   type: http
   seq: 2
 http:
   method: POST
-  url: '{{baseUrl}}/api/documents'
+  url: '{{baseUrl}}/api/v1/documents'
   headers:
   - name: Authorization
     value: Bearer {{accessToken}}
-  - name: Content-Type
-    value: application/json
   body:
-    type: json
-    data: |
-      {
-        "filename": "invoice.pdf",
-        "contentType": "application/pdf",
-        "description": "October electricity invoice"
-      }
+    type: multipart-form
+    data:
+    - name: file
+      type: file
+      value:
+      - ../tests/fixtures/sample.pdf
+      contentType: application/pdf
+    - name: title
+      type: text
+      value: Sample invoice
+    - name: description
+      type: text
+      value: Reusable synthetic PDF
 runtime:
   scripts:
   - type: after-response
     code: |
-      if (res.status === 201) {
-        bru.setVar("documentId", res.body.id);
+      if (res.status === 202) {
+        bru.setVar("documentId", res.body.document.id);
       }
+docs: Stores the PDF now; processing is unavailable and all stages are NOT_STARTED.
