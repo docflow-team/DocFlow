@@ -2,6 +2,8 @@
 
 **Course:** SWEN3 / BIF5
 
+**Repository:** [docflow-team/DocFlow](https://github.com/docflow-team/DocFlow)
+
 **Current sprint:** Sprint 2
 
 **Updated:** 13 November 2026

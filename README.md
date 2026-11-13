@@ -209,3 +209,11 @@ Categories are seeded at startup. Choose IDs from List categories; replacing ass
 
 Requests use the current `/api/...` controller routes; the exported `contracts/openapi.yaml`
 documents the implemented routes; the architecture also describes planned features.
+
+## Project ZIP
+
+Run `bash scripts/create-zip.sh` from the project root using Bash, Git and `zip`
+(on Windows, use Git Bash). It creates `../DocFlow.zip` with current tracked and
+non-ignored new files, excluding other ZIPs. Git history, local `.env` settings,
+dependencies and generated output are excluded by the repository's ignore rules.
+Move or remove an existing archive before running it again.
