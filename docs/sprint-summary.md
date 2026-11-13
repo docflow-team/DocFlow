@@ -6,7 +6,7 @@
 
 ## Delivered functionality
 
-The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsive React app supports login, password change, protected navigation and owner-only PDF screens; UI category/tag editing and Nginx serving remain pending.
+The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsive React app supports login, password change, protected navigation and owner-only PDF, category and tag screens; Nginx serving remains pending.
 
 - Validated PDF upload/download, paginated listing, details, title/description editing and deletion. Upload returns `202` with inactive `NOT_STARTED` processing stages.
 - Owner-only document access, including updates, deletion and category assignment. Other owners' documents return `404`, including to administrators; metadata-only legacy rows are hidden.
@@ -18,7 +18,7 @@ The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsi
 - Public health endpoint, safe JSON errors and request examples in Bruno and HTTP files.
 - Source-built MinIO service, persistent private bucket and a storage adapter for generated-key upload, reading and deletion. API startup creates a missing bucket; bootstrap does not require storage access.
 - React login by username/email, required temporary-password change, ordinary password change and sign-out. In-memory sessions expire or end on authenticated `401`; private queries/UI are cleared and late responses ignored.
-- React document screens for paginated listing, validated multipart PDF upload (`202` stored without background queue), read-only details and `NOT_STARTED` processing status, title/description editing (including `null` description clearing), authenticated PDF download with original filename, confirmed deletion and neutral `404` handling.
+- React document screens for paginated listing, validated multipart PDF upload (`202` stored without background queue), read-only details and `NOT_STARTED` processing status, independent metadata editing (including `null` description clearing), manual category multi-select (`PUT /documents/{id}/categories` including `Unclassified` clearing), normalized per-tag editing (`PUT /documents/{id}/tags` including empty clearing and `409` retry), authenticated PDF download with original filename, confirmed deletion and neutral `404` handling.
 - React/TypeScript/Vite foundation, CSS Modules, app error boundary and typed fetch client for JSON, multipart uploads, binary downloads, problem errors and request cancellation.
 
 The current routes and payloads are documented in [OpenAPI](../contracts/openapi.yaml); [README](../README.md#current-api) provides the quick reference. All document, category, authentication and account routes use `/api/v1`.
@@ -44,7 +44,7 @@ Verification on 13 November 2026: `clean verify` passed **78 tests, 0 failures, 
 
 The API image build and Compose configuration passed. The tag increment passed **57 HTTP checks** against an isolated PostgreSQL/MinIO deployment: schema upgrade with existing PDFs/categories/accounts, normalization and boundaries, cross-owner tag reuse/isolation, database rollback without partial changes, restart persistence and deletion retaining shared rows. Bootstrap passed without storage/JWT credentials. PDF bytes and category assignments were preserved; credential-log checks passed. Disposable containers, network and volumes were removed. Earlier checks verified PDF file/page/multipart limits and category seeding/replacement.
 
-Clean frontend installs, lint, typecheck, formatting, **34 tests across 3 files** and production builds passed on Node 24.22.3. Chrome checks at 1280px, 375px and 320px verified responsive authentication and document screens without horizontal overflow. Against a disposable real Compose API, verified rejected login, temporary-password routing, server field errors, password change and fresh login, token revocation, logout, reload ending the session, offline retry, invalid-PDF upload rejection preserving draft fields, `202` upload opening details with `NOT_STARTED` stages, metadata editing with null-description clearing, byte-identical authenticated PDF download, cancel/confirm deletion, neutral `404` for another owner's document and keyboard focus retention. Browser storage/cookies stayed empty and the console stayed clean. Component tests cover validation, pagination, empty states, multipart/metadata payloads, object-URL cleanup, deletion flows, cache cleanup, expiry and late responses after switching sessions; transport tests cover JSON/multipart/binary and problem errors. Viewport emulation was cleared and disposable processes/containers/volumes were removed.
+Clean frontend installs, lint, typecheck, formatting, **36 tests across 3 files** and production builds passed on Node 24.22.3. Chrome checks at 1280px, 375px and 320px verified responsive authentication, document, category and tag screens without horizontal overflow. Against a disposable real Compose API, verified rejected login, temporary-password routing, server field errors, password change and fresh login, token revocation, logout, reload ending the session, offline retry, invalid-PDF upload rejection preserving draft fields, `202` upload opening details with `NOT_STARTED` stages, metadata editing with null-description clearing, seeded category assignment/clearing (`Unclassified`), tag validation/server-authoritative normalization/sorting/clearing, byte-identical authenticated PDF download, cancel/confirm deletion, two-owner isolation (`admin` and `alice`, neutral `404` for another owner's document) and keyboard focus retention. Browser storage/cookies stayed empty and the console showed no unexpected errors. Component tests cover validation, pagination, empty states, multipart/metadata/category/tag payloads, failed category loads preserving assignments, draft isolation across sections, `409` tag conflict retry, detail/list query consistency, object-URL cleanup, deletion flows, cache cleanup, expiry and late responses after switching sessions; transport tests cover JSON/multipart/binary and problem errors. Viewport emulation was cleared and disposable processes/containers/volumes were removed.
 
 GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publishes Surefire reports and verifies both API and MinIO source image builds. A separate frontend workflow runs the verified npm checks. Automated PostgreSQL/MinIO integration tests and the coverage gate remain planned. Current test commands and report paths are in [README](../README.md#build-and-test).
 
@@ -52,11 +52,11 @@ GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publis
 
 Sprint 2 targets login and owner-only PDF management through React/Nginx and local Docker Compose, including tags and manual categories. Account creation is API-only. See the [agreed contracts](architecture.md#sprint-2-contract-decisions) for scope and the [task list](sprint-2-tasks.md) for each task's purpose; task progress is tracked separately in [sprint-2-progress.md](sprint-2-progress.md).
 
-Remaining work adds document React screens, Nginx and focused integration/coverage checks. Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
+Remaining work adds Nginx and focused integration/coverage checks. Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
 
 ## Current limitations
 
-- UI category/tag editing, Nginx serving, OCR, search, messaging and AI processing remain pending.
+- Nginx serving, OCR, search, messaging and AI processing remain pending.
 - Account listing/editing/disabling/reset and administration screens are deferred; login throttling is required before hosted access.
 - Category administration and classification approval/source metadata are deferred; current assignments are manual.
 - Existing `public`-schema records are not migrated; metadata-only rows are retained without being exposed as stored PDFs.

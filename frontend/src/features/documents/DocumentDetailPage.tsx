@@ -17,6 +17,7 @@ import {
   normalizeDescription,
   validateMetadata,
 } from './documentHelpers';
+import { DocumentTaxonomySections } from './DocumentTaxonomySections';
 import styles from './Documents.module.css';
 
 function parseId(raw: string | undefined): number | null {
@@ -581,6 +582,8 @@ export function DocumentDetailPage() {
                 </button>
               </div>
             </form>
+
+            <DocumentTaxonomySections doc={doc} />
           </>
         )
       )}

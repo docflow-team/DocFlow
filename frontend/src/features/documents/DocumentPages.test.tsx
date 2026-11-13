@@ -13,6 +13,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
 import { apiBlob, apiJson, ApiError } from '../../shared/api/client';
 import type {
+  CategoryResponse,
   DocumentPageResponse,
   DocumentResponse,
   ProcessingResponse,
@@ -231,6 +232,7 @@ it('validates upload bounds locally and submits multipart FormData for 202 navig
     }
     if (path === '/documents/55') return created;
     if (path === '/documents/55/processing') return makeProcessing(55);
+    if (path === '/categories') return [];
     return makePage([]);
   });
 
@@ -351,6 +353,7 @@ it('displays read-only details, inactive processing stages, and neutral 404 with
     if (path === '/auth/me') return user;
     if (path === '/documents/10') return doc;
     if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/categories') return [];
     if (path === '/documents/99')
       throw new ApiError(404, { detail: 'Document not found' });
     return makePage([]);
@@ -384,6 +387,7 @@ it('updates metadata with null description clearing and preserves draft on faile
     if (path === '/auth/me') return user;
     if (path === '/documents/10') return doc;
     if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/categories') return [];
     if (path === '/documents/10/metadata' && options?.method === 'PUT') {
       if (failNextSave) {
         throw new ApiError(400, {
@@ -443,6 +447,7 @@ it('downloads authenticated PDF bytes with original filename and revokes object 
     if (path === '/auth/me') return user;
     if (path === '/documents/10') return doc;
     if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/categories') return [];
     return makePage([doc]);
   });
 
@@ -494,6 +499,7 @@ it('handles deletion cancellation, failure retry, and cache cleanup on 204', asy
     }
     if (path === '/documents/10') return doc;
     if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/categories') return [];
     return makePage([]);
   });
 
@@ -547,6 +553,7 @@ it('aborts pending document requests on logout and ignores late old-session resu
       return makeDoc({ title: 'New session document' });
     }
     if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/categories') return [];
     return makePage([]);
   });
 
@@ -574,4 +581,222 @@ it('aborts pending document requests on logout and ignores late old-session resu
   expect(
     (client.getQueryData(documentKeys.detail(10)) as DocumentResponse).title,
   ).toBe('New session document');
+});
+
+it('handles failed category choice loading, preselected/multiple/empty categories, and detail/list consistency', async () => {
+  const categories: CategoryResponse[] = [
+    { id: 2, name: 'Contract', description: 'Signed agreements' },
+    { id: 1, name: 'Invoice', description: null },
+    { id: 5, name: 'Tax', description: 'Annual filings' },
+  ];
+  let doc = makeDoc({
+    categories: [{ id: 1, name: 'Invoice', description: null }],
+    tags: [],
+  });
+  let failCategoryFetch = true;
+  let failCategorySave = true;
+
+  api.mockImplementation(async (path, options) => {
+    if (path === '/auth/login') return token;
+    if (path === '/auth/me') return user;
+    if (path === '/categories') {
+      if (failCategoryFetch) throw new TypeError('offline');
+      return categories;
+    }
+    if (path === '/documents/10') return doc;
+    if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/documents/10/categories' && options?.method === 'PUT') {
+      if (failCategorySave) {
+        throw new ApiError(400, { detail: 'Unknown category ID' });
+      }
+      const body = options.body as { categoryIds: number[] };
+      doc = {
+        ...doc,
+        categories: categories
+          .filter((cat) => body.categoryIds.includes(cat.id))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+      return doc;
+    }
+    if (path.startsWith('/documents?')) return makePage([doc]);
+    return undefined;
+  });
+
+  const { client } = await openSignedIn(['/documents/10']);
+  await screen.findByText(
+    'Could not load categories. Current assignments are unchanged.',
+  );
+  // Current document assignment remains visible and no empty PUT was issued.
+  expect(screen.getByText('Invoice')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Save categories' })).toBeNull();
+
+  // Keep an unrelated metadata draft while fixing categories.
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Unsaved title draft' },
+  });
+
+  failCategoryFetch = false;
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+  const invoiceBox = (await screen.findByLabelText(
+    /Invoice/,
+  )) as HTMLInputElement;
+  const contractBox = screen.getByLabelText(/Contract/) as HTMLInputElement;
+  const taxBox = screen.getByLabelText(/Tax/) as HTMLInputElement;
+  expect(invoiceBox.checked).toBe(true);
+  expect(contractBox.checked).toBe(false);
+  expect(taxBox.checked).toBe(false);
+
+  // Select multiple categories, fail once and verify selection + metadata draft survive.
+  fireEvent.click(contractBox);
+  fireEvent.click(taxBox);
+  fireEvent.click(screen.getByRole('button', { name: 'Save categories' }));
+  await screen.findByText('Unknown category ID');
+  expect(contractBox.checked).toBe(true);
+  expect(taxBox.checked).toBe(true);
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+    'Unsaved title draft',
+  );
+
+  // Save succeeds, updates detail & invalidates list.
+  const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+  failCategorySave = false;
+  fireEvent.click(screen.getByRole('button', { name: 'Save categories' }));
+  await screen.findByText('Categories saved.');
+  expect(api).toHaveBeenCalledWith(
+    '/documents/10/categories',
+    expect.objectContaining({
+      method: 'PUT',
+      body: { categoryIds: [1, 2, 5] },
+      token: 'doc-token',
+    }),
+  );
+  expect(invalidateSpy).toHaveBeenCalledWith({
+    queryKey: documentKeys.detail(10),
+  });
+  expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: documentKeys.lists });
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+    'Unsaved title draft',
+  );
+
+  // Uncheck all -> empty [] clears to Unclassified and propagates to list.
+  fireEvent.click(invoiceBox);
+  fireEvent.click(contractBox);
+  fireEvent.click(taxBox);
+  expect(
+    screen.getByText('Selected state: Unclassified (no categories assigned).'),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Save categories' }));
+  await screen.findByText('Categories saved.');
+  expect(api).toHaveBeenCalledWith(
+    '/documents/10/categories',
+    expect.objectContaining({ method: 'PUT', body: { categoryIds: [] } }),
+  );
+
+  fireEvent.click(screen.getByRole('link', { name: 'Back to documents' }));
+  await screen.findByRole('link', { name: 'Quarterly invoice' });
+  expect(screen.getByText('Unclassified')).toBeTruthy();
+});
+
+it('validates tag limits, preserves input on 409 conflict, normalizes via server response, and clears tags', async () => {
+  let doc = makeDoc({ categories: [], tags: ['existing'] });
+  let failTagSave: number | null = 409;
+
+  api.mockImplementation(async (path, options) => {
+    if (path === '/auth/login') return token;
+    if (path === '/auth/me') return user;
+    if (path === '/categories') return [];
+    if (path === '/documents/10') return doc;
+    if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/documents/10/tags' && options?.method === 'PUT') {
+      if (failTagSave === 409) {
+        throw new ApiError(409, {
+          detail: 'The request conflicts with stored data',
+        });
+      }
+      const body = options.body as { tags: string[] };
+      const normalized = Array.from(
+        new Set(body.tags.map((t) => t.trim().toLowerCase())),
+      ).sort();
+      doc = { ...doc, tags: normalized };
+      return doc;
+    }
+    if (path.startsWith('/documents?')) return makePage([doc]);
+    return undefined;
+  });
+
+  const { client } = await openSignedIn(['/documents/10']);
+  await screen.findByRole('heading', { name: 'Quarterly invoice' });
+
+  const tagInput = screen.getByLabelText('Add tag');
+  const addButton = screen.getByRole('button', { name: 'Add tag' });
+
+  // Blank, >50 chars, and duplicate checks
+  fireEvent.click(addButton);
+  expect(screen.getByText('Enter a tag name.')).toBeTruthy();
+
+  fireEvent.change(tagInput, { target: { value: 'a'.repeat(51) } });
+  fireEvent.click(addButton);
+  expect(screen.getByText('Tag must not exceed 50 characters.')).toBeTruthy();
+
+  fireEvent.change(tagInput, { target: { value: '  EXISTING ' } });
+  fireEvent.click(addButton);
+  expect(screen.getByText('Tag is already added.')).toBeTruthy();
+
+  // Add tags including spaces/punctuation up to 20 total, verify 21st is blocked
+  fireEvent.change(tagInput, { target: { value: '  Machine Learning, Q4  ' } });
+  fireEvent.click(addButton);
+  for (let i = 2; i < 20; i++) {
+    fireEvent.change(tagInput, { target: { value: `Tag-${i}` } });
+    fireEvent.click(addButton);
+  }
+  fireEvent.change(tagInput, { target: { value: 'Tag-21' } });
+  fireEvent.click(addButton);
+  expect(screen.getByText('At most 20 unique tags are allowed.')).toBeTruthy();
+
+  // Remove back down to 2 tags while keeping an unrelated metadata draft
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Kept metadata draft' },
+  });
+  for (let i = 2; i < 20; i++) {
+    fireEvent.click(
+      screen.getByRole('button', { name: `Remove tag Tag-${i}` }),
+    );
+  }
+
+  // First save hits 409 -> preserves draft tags & metadata draft for manual retry
+  fireEvent.click(screen.getByRole('button', { name: 'Save tags' }));
+  await screen.findByText(/another change created a tag at the same time/i);
+  expect(screen.getByText('#Machine Learning, Q4')).toBeTruthy();
+  expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+    'Kept metadata draft',
+  );
+
+  // Manual retry succeeds -> displays authoritative server-normalized sorted list
+  const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+  failTagSave = null;
+  fireEvent.click(screen.getByRole('button', { name: 'Save tags' }));
+  await screen.findByText('Tags saved.');
+  expect(screen.getByText('#machine learning, q4')).toBeTruthy();
+  expect(screen.getByText('existing, machine learning, q4')).toBeTruthy();
+  expect(invalidateSpy).toHaveBeenCalledWith({
+    queryKey: documentKeys.detail(10),
+  });
+  expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: documentKeys.lists });
+
+  // Verify updated tags appear on list page
+  fireEvent.click(screen.getByRole('link', { name: 'Back to documents' }));
+  await screen.findByText('#machine learning, q4');
+
+  // Reopen detail and clear all tags -> sends { tags: [] }
+  fireEvent.click(screen.getByRole('link', { name: 'Quarterly invoice' }));
+  await screen.findByRole('button', { name: 'Clear all' });
+  fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save tags' }));
+  await screen.findByText('Tags saved.');
+  expect(api).toHaveBeenCalledWith(
+    '/documents/10/tags',
+    expect.objectContaining({ method: 'PUT', body: { tags: [] } }),
+  );
+  expect(screen.getByText('No tags')).toBeTruthy();
 });

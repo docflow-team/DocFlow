@@ -339,6 +339,107 @@
   overflow-wrap: anywhere;
 }
 
+.choiceList {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+
+.choiceItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e3e7e2;
+  border-radius: 0.45rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.choiceItem input[type='checkbox'] {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0.15rem 0 0;
+  flex-shrink: 0;
+  accent-color: #17604e;
+}
+
+.choiceText {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.choiceName {
+  font-weight: 650;
+}
+
+.inlineForm {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.inlineForm input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #8b9b92;
+  border-radius: 0.4rem;
+  background: #fff;
+  color: #203732;
+  font: inherit;
+}
+
+.inlineForm input[aria-invalid='true'] {
+  border-color: #9c3026;
+}
+
+.tagEditorList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tagEditorPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+  border: 1px solid #d6dcd5;
+  border-radius: 999px;
+  background: #f5f4ef;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.removeTagButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #56645e;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.removeTagButton:hover {
+  background: #e4e7e2;
+  color: #203732;
+}
+
 @media (max-width: 760px) {
   .detailGrid {
     grid-template-columns: 1fr;

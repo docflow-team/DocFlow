@@ -2,13 +2,31 @@ import { ApiError } from '../../shared/api/client';
 
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const PAGE_SIZE = 20;
+export const MAX_TAGS = 20;
+export const MAX_TAG_LENGTH = 50;
 
 export const documentKeys = {
   lists: ['documents', 'list'] as const,
   list: (page: number) => ['documents', 'list', page] as const,
   detail: (id: number) => ['documents', 'detail', id] as const,
   processing: (id: number) => ['documents', 'processing', id] as const,
+  categories: ['categories'] as const,
 };
+
+export function validateTagName(
+  raw: string,
+  existingTags: string[],
+): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return 'Enter a tag name.';
+  if (trimmed.length > MAX_TAG_LENGTH)
+    return 'Tag must not exceed 50 characters.';
+  if (existingTags.some((tag) => tag.toLowerCase() === trimmed.toLowerCase()))
+    return 'Tag is already added.';
+  if (existingTags.length >= MAX_TAGS)
+    return 'At most 20 unique tags are allowed.';
+  return undefined;
+}
 
 export function validateMetadata(
   title: string,
