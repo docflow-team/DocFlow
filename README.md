@@ -139,7 +139,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite forwards `/api` to the backend at `http://localhost:8080`. The current UI is an app shell; login and document screens follow separately.
+Open `http://localhost:5173`. Vite forwards `/api` to the backend at `http://localhost:8080`. Sign in with an admin-created account; temporary passwords must be changed first. Reloading ends the session. Document screens are still pending.
 
 Run frontend checks from `frontend/`:
 

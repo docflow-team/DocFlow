@@ -6,7 +6,7 @@
 
 ## Delivered functionality
 
-The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsive React app shell and typed API client are available; login and document screens remain pending.
+The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsive React app supports login, password change and protected navigation; document screens remain pending.
 
 - Validated PDF upload/download, paginated listing, details, title/description editing and deletion. Upload returns `202` with inactive `NOT_STARTED` processing stages.
 - Owner-only document access, including updates, deletion and category assignment. Other owners' documents return `404`, including to administrators; metadata-only legacy rows are hidden.
@@ -17,6 +17,7 @@ The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsi
 - Explicit first-admin bootstrap, which skips creation when accounts already exist. Temporary-password accounts may only change password or log out.
 - Public health endpoint, safe JSON errors and request examples in Bruno and HTTP files.
 - Source-built MinIO service, persistent private bucket and a storage adapter for generated-key upload, reading and deletion. API startup creates a missing bucket; bootstrap does not require storage access.
+- React login by username/email, required temporary-password change, ordinary password change and sign-out. In-memory sessions expire or end on authenticated `401`; private queries/UI are cleared and late responses ignored.
 - React/TypeScript/Vite foundation, CSS Modules, app error boundary and typed fetch client for JSON, multipart uploads, binary downloads, problem errors and request cancellation.
 
 The current routes and payloads are documented in [OpenAPI](../contracts/openapi.yaml); [README](../README.md#current-api) provides the quick reference. All document, category, authentication and account routes use `/api/v1`.
@@ -42,7 +43,7 @@ Verification on 13 November 2026: `clean verify` passed **78 tests, 0 failures, 
 
 The API image build and Compose configuration passed. The tag increment passed **57 HTTP checks** against an isolated PostgreSQL/MinIO deployment: schema upgrade with existing PDFs/categories/accounts, normalization and boundaries, cross-owner tag reuse/isolation, database rollback without partial changes, restart persistence and deletion retaining shared rows. Bootstrap passed without storage/JWT credentials. PDF bytes and category assignments were preserved; credential-log checks passed. Disposable containers, network and volumes were removed. Earlier checks verified PDF file/page/multipart limits and category seeding/replacement.
 
-Clean frontend installs, lint, typecheck, formatting, **12 tests** and production builds passed on Node 24.22.3 on Windows and Linux. Chrome checks at desktop/phone widths, including the production build at 320px without console errors, found no horizontal overflow; browser requests against a temporary stub confirmed that the Vite proxy preserves `/api/v1`, bearer/JSON payloads, multipart boundaries, PDF bytes, empty deletion and validation errors. Viewport emulation was cleared and temporary processes/containers were removed.
+Clean frontend installs, lint, typecheck, formatting, **25 tests** and production builds passed on Node 24.22.3 on Windows and Linux. Chrome checks at 1280px, 375px and 320px verified responsive authentication screens without horizontal overflow. Against a disposable real Compose API, verified rejected login, temporary-password routing, server field errors, password change and fresh login, token revocation, logout, reload ending the session and offline retry. Browser storage/cookies stayed empty. Component tests cover validation, cache cleanup, expiry and late responses after switching sessions; transport tests cover JSON/multipart/binary and problem errors. Viewport emulation was cleared and disposable processes/containers/volumes were removed.
 
 GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publishes Surefire reports and verifies both API and MinIO source image builds. A separate frontend workflow runs the verified npm checks. Automated PostgreSQL/MinIO integration tests and the coverage gate remain planned. Current test commands and report paths are in [README](../README.md#build-and-test).
 
@@ -50,11 +51,11 @@ GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publis
 
 Sprint 2 targets login and owner-only PDF management through React/Nginx and local Docker Compose, including tags and manual categories. Account creation is API-only. See the [agreed contracts](architecture.md#sprint-2-contract-decisions) for scope and the [task list](sprint-2-tasks.md) for each task's purpose; task progress is tracked separately in [sprint-2-progress.md](sprint-2-progress.md).
 
-Remaining work adds login/document React screens, Nginx and focused integration/coverage checks. Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
+Remaining work adds document React screens, Nginx and focused integration/coverage checks. Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
 
 ## Current limitations
 
-- The frontend currently shows an app shell; authentication/document screens, Nginx serving, OCR, search, messaging and AI processing remain pending.
+- Document screens, Nginx serving, OCR, search, messaging and AI processing remain pending.
 - Account listing/editing/disabling/reset and administration screens are deferred; login throttling is required before hosted access.
 - Category administration and classification approval/source metadata are deferred; current assignments are manual.
 - Existing `public`-schema records are not migrated; metadata-only rows are retained without being exposed as stored PDFs.

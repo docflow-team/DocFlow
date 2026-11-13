@@ -1,0 +1,110 @@
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(2rem, 7vw, 7rem);
+  align-items: start;
+  padding-top: clamp(3rem, 8vw, 7rem);
+}
+.intro h1 {
+  margin: 0 0 1.5rem;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 1.1;
+  letter-spacing: -0.055em;
+}
+.intro p {
+  max-width: 25rem;
+  line-height: 1.7;
+  color: #56645e;
+}
+.intro .eyebrow {
+  margin-bottom: 1.5rem;
+  color: #31614e;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 650;
+}
+.card {
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  background: #fff;
+  border: 1px solid #d6dcd5;
+  border-radius: 1rem;
+}
+.card fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.field {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.field label {
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+.field input {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.75rem;
+  border: 1px solid #8b9b92;
+  border-radius: 0.4rem;
+  background: #fff;
+  color: #203732;
+  font: inherit;
+}
+.field input[aria-invalid='true'] {
+  border-color: #9c3026;
+}
+.fieldError,
+.error {
+  color: #9c3026;
+}
+.fieldError {
+  font-size: 0.85rem;
+}
+.error,
+.notice {
+  padding: 0.9rem;
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+  border-radius: 0.4rem;
+}
+.error {
+  background: #fff2ed;
+}
+.notice {
+  background: #edf5ee;
+}
+.submit {
+  width: 100%;
+  min-height: 3rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: #17604e;
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.hint {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #56645e;
+}
+@media (max-width: 700px) {
+  .layout {
+    grid-template-columns: 1fr;
+    padding-top: 2.5rem;
+    gap: 1.5rem;
+  }
+  .intro h1 {
+    margin-bottom: 1rem;
+  }
+}

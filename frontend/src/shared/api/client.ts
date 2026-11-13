@@ -1,6 +1,6 @@
 import type { ProblemDetail } from './types';
 
-interface RequestOptions {
+export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   token?: string;

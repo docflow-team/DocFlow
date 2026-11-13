@@ -66,3 +66,26 @@
     gap: 0.75rem;
   }
 }
+
+.navigation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.navigation button {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid #8b9b92;
+  border-radius: 0.4rem;
+  color: #203732;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.navigation a {
+  padding: 0.75rem 0;
+}
