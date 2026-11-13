@@ -63,18 +63,14 @@ export function DocumentDetailPage() {
   const metadataRequest = useRef<AbortController | null>(null);
   const downloadRequest = useRef<AbortController | null>(null);
   const deleteRequest = useRef<AbortController | null>(null);
-  const activeObjectUrls = useRef<Set<string>>(new Set());
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const confirmHeadingRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
-    const urls = activeObjectUrls.current;
     return () => {
       metadataRequest.current?.abort();
       downloadRequest.current?.abort();
       deleteRequest.current?.abort();
-      urls.forEach((url) => URL.revokeObjectURL(url));
-      urls.clear();
     };
   }, []);
 
@@ -135,7 +131,6 @@ export function DocumentDetailPage() {
         signal: controller.signal,
       });
       const url = URL.createObjectURL(fileBlob);
-      activeObjectUrls.current.add(url);
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
@@ -146,7 +141,6 @@ export function DocumentDetailPage() {
       } finally {
         link.remove();
         URL.revokeObjectURL(url);
-        activeObjectUrls.current.delete(url);
       }
     },
   });
@@ -193,7 +187,7 @@ export function DocumentDetailPage() {
     documentId === null ||
     (documentQuery.error instanceof ApiError &&
       documentQuery.error.status === 404);
-  const doc = documentQuery.data;
+  const doc = notFound ? undefined : documentQuery.data;
 
   const headingTitle = notFound
     ? 'Document not found.'
@@ -287,17 +281,8 @@ export function DocumentDetailPage() {
         </div>
       </div>
 
-      {notFound ? (
-        <div className={styles.card}>
-          <p className={styles.hint}>
-            This document is not available in your workspace.
-          </p>
-        </div>
-      ) : documentQuery.isPending ? (
-        <p className={styles.hint} role="status">
-          Loading document...
-        </p>
-      ) : documentQuery.isError ? (
+      {!notFound &&
+        documentQuery.isError &&
         documentQuery.error.name !== 'AbortError' && (
           <div className={styles.errorBox} role="alert">
             <p>
@@ -316,7 +301,18 @@ export function DocumentDetailPage() {
               </button>
             </div>
           </div>
-        )
+        )}
+
+      {notFound ? (
+        <div className={styles.card}>
+          <p className={styles.hint}>
+            This document is not available in your workspace.
+          </p>
+        </div>
+      ) : documentQuery.isPending ? (
+        <p className={styles.hint} role="status">
+          Loading document...
+        </p>
       ) : (
         doc && (
           <>

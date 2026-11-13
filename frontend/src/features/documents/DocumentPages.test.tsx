@@ -440,6 +440,61 @@ it('updates metadata with null description clearing and preserves draft on faile
   expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: documentKeys.lists });
 });
 
+it('preserves category and tag drafts through a failed detail refresh and retry', async () => {
+  const doc = makeDoc();
+  let failRefresh = false;
+  api.mockImplementation(async (path, options) => {
+    if (path === '/auth/login') return token;
+    if (path === '/auth/me') return user;
+    if (path === '/documents/10') {
+      if (failRefresh) throw new TypeError('offline');
+      return doc;
+    }
+    if (path === '/documents/10/processing') return makeProcessing(10);
+    if (path === '/categories') return doc.categories;
+    if (path === '/documents/10/metadata' && options?.method === 'PUT') {
+      failRefresh = true;
+      return doc;
+    }
+    return makePage([doc]);
+  });
+
+  const { client } = await openSignedIn(['/documents/10']);
+  fireEvent.click(await screen.findByLabelText(/Invoice/));
+  fireEvent.change(screen.getByLabelText('Add tag'), {
+    target: { value: 'unsaved-tag' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save metadata' }));
+
+  const refreshError =
+    'Could not load this document. Check your connection and try again.';
+  await screen.findByText(refreshError);
+  expect((screen.getByLabelText(/Invoice/) as HTMLInputElement).checked).toBe(
+    false,
+  );
+  expect(screen.getByText('#unsaved-tag')).toBeTruthy();
+
+  failRefresh = false;
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() => expect(screen.queryByText(refreshError)).toBeNull());
+  expect((screen.getByLabelText(/Invoice/) as HTMLInputElement).checked).toBe(
+    false,
+  );
+  expect(screen.getByText('#unsaved-tag')).toBeTruthy();
+
+  // A definitive 404 still hides cached document content and editors.
+  api.mockRejectedValueOnce(
+    new ApiError(404, { detail: 'Document not found' }),
+  );
+  await act(() =>
+    client.invalidateQueries({ queryKey: documentKeys.detail(10) }),
+  );
+  await screen.findByRole('heading', { name: 'Document not found.' });
+  expect(screen.queryByText('#unsaved-tag')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Download PDF' })).toBeNull();
+});
+
 it('downloads authenticated PDF bytes with original filename and revokes object URLs', async () => {
   const doc = makeDoc();
   api.mockImplementation(async (path) => {
