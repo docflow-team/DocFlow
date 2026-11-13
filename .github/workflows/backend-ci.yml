@@ -28,6 +28,6 @@ jobs:
         with:
           name: backend-test-reports
           if-no-files-found: warn
-          path: backend/target/surefire-reports/
+          path: backend/apps/api/target/surefire-reports/
       - name: Verify API Docker image build
         run: docker build --file backend/Dockerfile --tag docflow-api:ci .

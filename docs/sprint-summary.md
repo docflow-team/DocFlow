@@ -1,10 +1,10 @@
-# DocFlow — Sprint 1 Summary
+# DocFlow — Sprint summary
 
 **Course:** SWEN3 / BIF5
 
-**Updated:** 20 October 2026
+**Updated:** 13 November 2026
 
-**Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature.
+**Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature. Sprint 2 has moved the existing application into a Maven API module without changing its HTTP behavior.
 
 ## Sprint goal
 
@@ -79,14 +79,21 @@ HTTP request
 The backend is organized as follows:
 
 ~~~text
-backend/src/main/java/com/docflow/backend/
-├── controller/   REST endpoints
-├── dto/          Request and response models
-├── entity/       JPA entities and relationships
-├── mapper/       DTO/entity conversion
-├── repository/   Spring Data repositories
-└── service/      Application logic
+backend/
+├── pom.xml                         Maven parent; includes apps/api
+├── mvnw / mvnw.cmd                 Maven Wrapper
+└── apps/api/
+    ├── pom.xml                     Spring Boot API dependencies/build
+    └── src/main/java/at/fhtw/docflow/
+        ├── BackendApplication.java
+        ├── api/                    Health endpoint and shared error handling
+        └── document/
+            ├── api/                Document/type controllers, DTOs and manual mappers
+            ├── application/        Existing document/type services
+            └── persistence/        JPA entities and Spring Data repositories
 ~~~
+
+Tests follow the same packages under `apps/api/src/test/java`. This is a structural move only: services still use JPA entities and the mappers remain handwritten. Separate business models, interfaces and MapStruct are the next architecture work.
 
 ## Required API contract
 
@@ -148,6 +155,10 @@ Run the complete backend verification from the backend directory:
 ~~~
 
 Verified result on 20 October 2026: **31 tests, 0 failures, 0 errors, 0 skipped** (`mvnw.cmd -B -ntp verify`). Controller tests check JSON response media types and bodies, including validation, missing resources, malformed JSON, unsupported request media types and unexpected errors.
+
+Restructuring verification on 12 November 2026: the baseline suite passed before the move, and the parent/API reactor passed `mvnw.cmd -B -ntp clean verify` afterward with **31 tests, 0 failures, 0 errors, 0 skipped**. The executable artifact is now `backend/apps/api/target/api-0.0.1-SNAPSHOT.jar`, and CI collects reports from `backend/apps/api/target/surefire-reports/`. The `/api/...` routes, response bodies, validation and Hibernate `update` setting are unchanged.
+
+Container verification on 13 November 2026: Compose configuration and the restructured Docker image build passed. An isolated Compose deployment of that image with PostgreSQL passed **15 HTTP checks across all nine endpoint operations**, covering the document/type workflow, generated/protected fields, JSON success/error media types, validation/malformed JSON (`400`), missing resources (`404`), response negotiation (`406`), unsupported request media types (`415`) and empty successful deletion (`204`). The temporary containers, network and database volume were removed; existing project data was untouched.
 
 Docker Compose verification on 20 October 2026: rebuilt the backend and checked all nine endpoint operations. Every response body used `application/json`; successful deletion returned an empty **204**. Validation/malformed JSON (**400**), missing resources (**404**), unacceptable response media type (**406**) and unsupported request media type (**415**) also returned JSON. The demo document was deleted; one uniquely named verification type remains because type deletion is not implemented.
 
@@ -344,7 +355,7 @@ set -a
 source .env
 set +a
 cd backend
-./mvnw spring-boot:run
+./mvnw -pl apps/api spring-boot:run
 ~~~
 
 Alternatively, build and run the executable JAR:
@@ -352,7 +363,7 @@ Alternatively, build and run the executable JAR:
 ~~~bash
 cd backend
 ./mvnw -B -ntp clean package
-java -jar target/backend-0.0.1-SNAPSHOT.jar
+java -jar apps/api/target/api-0.0.1-SNAPSHOT.jar
 ~~~
 
 Reusable HTTP requests are also available in **tests/http/documents.http**.

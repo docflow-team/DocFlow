@@ -1,6 +1,6 @@
 # DocFlow
 
-Document management coursework project for SWEN3. The current backend is a single Spring Boot module in `backend/` with PostgreSQL persistence.
+Document management coursework project for SWEN3. `backend/pom.xml` is the Maven parent build; the Spring Boot REST application lives in `backend/apps/api/` and uses PostgreSQL persistence. The Maven Wrapper stays in `backend/`.
 
 ## Prerequisites and configuration
 
@@ -51,10 +51,22 @@ Run from `backend/`:
 
 ```bash
 ./mvnw -B -ntp test
-./mvnw -B -ntp clean package
+./mvnw -B -ntp clean verify
 ```
 
-The tests use an in-memory H2 database and do not require Docker. On Windows, use `mvnw.cmd`.
+The parent build includes the API module. Service/controller tests use mocks, and the application-context test uses H2; tests do not require Docker. Reports are written to `backend/apps/api/target/surefire-reports/`. On Windows, use `mvnw.cmd`.
+
+With PostgreSQL running and the datasource environment variables set, start the API from `backend/`:
+
+```bash
+./mvnw -pl apps/api spring-boot:run
+```
+
+Alternatively, after `clean verify`, run the packaged application from `backend/`:
+
+```bash
+java -jar apps/api/target/api-0.0.1-SNAPSHOT.jar
+```
 
 ## Current API
 
