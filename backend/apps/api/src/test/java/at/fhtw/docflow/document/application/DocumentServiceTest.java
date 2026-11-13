@@ -1,23 +1,20 @@
 package at.fhtw.docflow.document.application;
 
-import at.fhtw.docflow.document.persistence.Document;
-import at.fhtw.docflow.document.persistence.DocumentType;
-import at.fhtw.docflow.document.persistence.DocumentRepository;
-import at.fhtw.docflow.document.persistence.DocumentTypeRepository;
+import at.fhtw.docflow.document.domain.Document;
+import at.fhtw.docflow.document.domain.DocumentType;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import javax.print.Doc;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
 
 @ExtendWith(MockitoExtension.class)
 class DocumentServiceTest {
@@ -29,13 +26,13 @@ class DocumentServiceTest {
     private DocumentTypeRepository documentTypeRepository;
 
     @InjectMocks
-    private DocumentService documentService;
+    private DefaultDocumentService documentService;
 
     @Test
     void createDocumentShouldSaveDocument() {
 
         // Arrange
-        Document document = new Document(
+        Document document = Document.create(
                 "rechnung.pdf",
                 "application/pdf",
                 "Stromrechnung"
@@ -55,11 +52,11 @@ class DocumentServiceTest {
     @Test
     void getAllDocumentsShouldReturnDocuments() {
         // Arrange
-        Document doc1 = new Document(
+        Document doc1 = Document.create(
                 "rechnung.pdf", "application/pdf", "Rechung"
         );
 
-        Document doc2 = new Document(
+        Document doc2 = Document.create(
                 "vertrag.pdf", "application/pdf", "Vertrag"
         );
 
@@ -81,7 +78,7 @@ class DocumentServiceTest {
 
         // Arrange
         Long id = 1L;
-        Document document = new Document(
+        Document document = Document.create(
                 "rechung.pdf", "application/pdf", "Rechnung"
         );
 
@@ -96,7 +93,6 @@ class DocumentServiceTest {
         assertSame(document, result.get());
         verify(documentRepository).findById(id);
     }
-
 
     @Test
     void getDocumentByIdShouldReturnEmptyWhenNotFound() {
@@ -115,18 +111,17 @@ class DocumentServiceTest {
         verify(documentRepository).findById(id);
     }
 
-
     @Test
     void updateDocumentShouldUpdateMetadata() {
 
         // Arrange
         Long id = 1L;
 
-        Document existing = new Document(
+        Document existing = Document.create(
                 "alt.pdf", "application/pdf", "Alte Beschreibung"
         );
 
-        Document updated = new Document(
+        Document updated = Document.create(
                 "neu.pdf", "application/pdf", "Neue Beschreibung"
         );
 
@@ -150,14 +145,13 @@ class DocumentServiceTest {
         verify(documentRepository).save(existing);
     }
 
-
     @Test
     void updateDocumentShouldReturnEmptyWhenNotFound() {
 
         // Arrange
         Long id = 999L;
 
-        Document updated = new Document(
+        Document updated = Document.create(
                 "neu.pdf", "application/pdf", "Beschreibung"
         );
 
@@ -173,6 +167,24 @@ class DocumentServiceTest {
 
         verify(documentRepository).findById(id);
         verify(documentRepository, never()).save(any(Document.class));
+    }
+
+    @Test
+    void updateDocumentIgnoresIncomingIdentityTimeAndAssignments() {
+        var createdAt = java.time.LocalDateTime.of(2026, 11, 13, 12, 0);
+        Document existing = new Document(1L, "old.pdf", "application/pdf", "Old", createdAt, java.util.Set.of(2L));
+        Document changes = new Document(99L, "new.pdf", "application/pdf", null,
+                createdAt.plusDays(1), java.util.Set.of(3L));
+        when(documentRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(documentRepository.save(existing)).thenReturn(existing);
+
+        Document result = documentService.updateDocument(1L, changes).orElseThrow();
+
+        assertEquals(1L, result.getId());
+        assertEquals(createdAt, result.getCreatedAt());
+        assertEquals(java.util.Set.of(2L), result.getDocumentTypeIds());
+        assertNull(result.getDescription());
+        verify(documentRepository).save(existing);
     }
 
     @Test
@@ -192,7 +204,6 @@ class DocumentServiceTest {
         verify(documentRepository).deleteById(id);
     }
 
-
     @Test
     void deleteDocumentShouldReturnFalseWhenNotFound() {
 
@@ -211,7 +222,6 @@ class DocumentServiceTest {
         verify(documentRepository, never()).deleteById(anyLong());
     }
 
-
     @Test
     void addDocumentTypeShouldAssignTypeToDocument() {
 
@@ -219,13 +229,13 @@ class DocumentServiceTest {
         Long documentId = 1L;
         Long typeId = 2L;
 
-        Document document = new Document(
+        Document document = Document.create(
                 "rechnung.pdf",
                 "application/pdf",
                 "Stromrechnung"
         );
 
-        DocumentType documentType = new DocumentType(
+        DocumentType documentType = DocumentType.create(
                 "Invoice",
                 "Invoice document"
         );
@@ -240,11 +250,10 @@ class DocumentServiceTest {
         documentService.addDocumentType(documentId, typeId);
 
         // Assert
-        assertTrue(document.getDocumentTypes().contains(documentType));
+        assertTrue(document.getDocumentTypeIds().contains(typeId));
 
         verify(documentRepository).save(document);
     }
-
 
     @Test
     void addDocumentTypeShouldThrowWhenDocumentNotFound() {
@@ -266,8 +275,6 @@ class DocumentServiceTest {
                 .save(any(Document.class));
     }
 
-
-
     @Test
     void addDocumentTypeShouldThrowWhenTypeNotFound() {
 
@@ -275,7 +282,7 @@ class DocumentServiceTest {
         Long documentId = 1L;
         Long typeId = 999L;
 
-        Document document = new Document(
+        Document document = Document.create(
                 "rechnung.pdf",
                 "application/pdf",
                 "Stromrechnung"
@@ -293,12 +300,10 @@ class DocumentServiceTest {
                 () -> documentService.addDocumentType(documentId, typeId)
         );
 
-        assertTrue(document.getDocumentTypes().isEmpty());
+        assertTrue(document.getDocumentTypeIds().isEmpty());
 
         verify(documentRepository, never())
                 .save(any(Document.class));
     }
-
-
 
 }

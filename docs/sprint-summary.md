@@ -4,7 +4,7 @@
 
 **Updated:** 13 November 2026
 
-**Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature. Sprint 2 has moved the existing application into a Maven API module without changing its HTTP behavior.
+**Status:** The backend foundation and the required document metadata API are implemented. Document types and their many-to-many assignment to documents are available as an additional first domain feature. Sprint 2 has moved the application into a Maven API module and separated its HTTP, business and persistence boundaries using MapStruct, without changing its HTTP behavior.
 
 ## Sprint goal
 
@@ -57,9 +57,11 @@ The assignment is persisted but is not yet included in the document response. It
 - Spring Web MVC for the REST API
 - Spring Data JPA and Hibernate for persistence
 - PostgreSQL 18.6 in Docker Compose
-- H2 for the isolated Spring application-context test
-- Separate request and response DTOs
-- Manual mapping between DTOs and JPA entities
+- H2 for Spring application-context and adapter round-trip tests
+- Separate HTTP DTOs, plain Java business models and JPA entities
+- MapStruct 1.6.3 for DTO/model and entity/model boundaries, with strict unmapped-target checks
+- Application services and business repository interfaces, backed by JPA adapters
+- Service-owned transactions, read-only queries and disabled Open Session in View
 - Constructor injection in controllers and services
 - Jakarta Bean Validation for document requests
 - Maven Wrapper for reproducible builds
@@ -71,8 +73,9 @@ The assignment is persisted but is not yet included in the document response. It
 ~~~text
 HTTP request
     -> Controller
-    -> Service
-    -> Spring Data repository
+    -> Application service interface / implementation
+    -> Business repository interface
+    -> JPA adapter and Spring Data repository
     -> PostgreSQL
 ~~~
 
@@ -87,13 +90,15 @@ backend/
     └── src/main/java/at/fhtw/docflow/
         ├── BackendApplication.java
         ├── api/                    Health endpoint and shared error handling
+        ├── configuration/          Shared MapStruct configuration
         └── document/
-            ├── api/                Document/type controllers, DTOs and manual mappers
-            ├── application/        Existing document/type services
-            └── persistence/        JPA entities and Spring Data repositories
+            ├── api/                Controllers, HTTP DTOs and DTO/model mappers
+            ├── application/        Service interfaces/implementations and repository ports
+            ├── domain/             Plain Java Document and DocumentType models
+            └── persistence/        Entities, entity/model mappers, adapters and Spring Data
 ~~~
 
-Tests follow the same packages under `apps/api/src/test/java`. This is a structural move only: services still use JPA entities and the mappers remain handwritten. Separate business models, interfaces and MapStruct are the next architecture work.
+Tests follow the same packages under `apps/api/src/test/java`. Controllers and application services exchange business models rather than JPA entities; application services no longer use HTTP request/response DTOs. Document behavior validates metadata, preserves server-controlled fields and manages assignments by type ID. Persistence adapters resolve shared JPA references and map back to detached business models within service transactions. The database tables and API payloads remain unchanged.
 
 ## Required API contract
 
@@ -158,6 +163,10 @@ Verified result on 20 October 2026: **31 tests, 0 failures, 0 errors, 0 skipped*
 
 Restructuring verification on 12 November 2026: the baseline suite passed before the move, and the parent/API reactor passed `mvnw.cmd -B -ntp clean verify` afterward with **31 tests, 0 failures, 0 errors, 0 skipped**. The executable artifact is now `backend/apps/api/target/api-0.0.1-SNAPSHOT.jar`, and CI collects reports from `backend/apps/api/target/surefire-reports/`. The `/api/...` routes, response bodies, validation and Hibernate `update` setting are unchanged.
 
+Layering verification on 13 November 2026: `mvnw.cmd -B -ntp clean verify` passed **42 tests, 0 failures, 0 errors, 0 skipped**. New checks exercise metadata invariants without Spring, request/entity mapping of protected fields and null descriptions, conversion of shared type entities into IDs, and service protection against incoming identity/time/assignment changes. An H2 round-trip test uses the actual service proxies, adapters and generated mappers across transactions; repeated assignment remains unique, metadata updates preserve assignments, and document deletion preserves the shared type. PostgreSQL integration-test automation and the coverage gate remain pending.
+
+The image rebuilt successfully after the layering changes. An isolated Compose deployment with PostgreSQL passed **24 HTTP checks** across all nine operations, including reads and metadata updates after assignment, repeated assignment, description clearing and shared-type preservation after deletion. The temporary containers, network and database volume were removed.
+
 Container verification on 13 November 2026: Compose configuration and the restructured Docker image build passed. An isolated Compose deployment of that image with PostgreSQL passed **15 HTTP checks across all nine endpoint operations**, covering the document/type workflow, generated/protected fields, JSON success/error media types, validation/malformed JSON (`400`), missing resources (`404`), response negotiation (`406`), unsupported request media types (`415`) and empty successful deletion (`204`). The temporary containers, network and database volume were removed; existing project data was untouched.
 
 Docker Compose verification on 20 October 2026: rebuilt the backend and checked all nine endpoint operations. Every response body used `application/json`; successful deletion returned an empty **204**. Validation/malformed JSON (**400**), missing resources (**404**), unacceptable response media type (**406**) and unsupported request media type (**415**) also returned JSON. The demo document was deleted; one uniquely named verification type remains because type deletion is not implemented.
@@ -170,7 +179,9 @@ The test suite covers:
 - Document controller routes, status codes, and request validation
 - Health endpoint route, status, and response body
 - Document type service and controller
-- Complete Spring application-context startup with H2
+- Plain Java document invariants and protected metadata updates
+- Generated mapping boundaries, null values and type-ID conversion
+- Complete Spring application-context startup and adapter round trip with H2
 
 GitHub Actions runs **clean verify** for pull requests and pushes to **dev** or **main**. After successful tests, it also verifies the backend Docker image build. A coverage gate and PostgreSQL integration tests are not configured yet.
 

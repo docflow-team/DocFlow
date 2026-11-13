@@ -1,10 +1,6 @@
 package at.fhtw.docflow.document.api;
 
-import at.fhtw.docflow.document.api.DocumentRequest;
-import at.fhtw.docflow.document.api.DocumentTypeAssignmentResponse;
-import at.fhtw.docflow.document.api.DocumentResponse;
-import at.fhtw.docflow.document.persistence.Document;
-import at.fhtw.docflow.document.api.DocumentMapper;
+import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.application.DocumentService;
 
 import jakarta.validation.Valid;
@@ -21,33 +17,35 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentMapper mapper;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, DocumentMapper mapper) {
         this.documentService = documentService;
+        this.mapper = mapper;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public DocumentResponse createDocument(@Valid @RequestBody DocumentRequest request) {
-        Document document = DocumentMapper.toEntity(request);
+        Document document = mapper.toDomain(request);
 
         Document savedDocument = documentService.createDocument(document);
 
-        return DocumentMapper.toResponse(savedDocument);
+        return mapper.toResponse(savedDocument);
     }
 
     @GetMapping
     public List<DocumentResponse> getAllDocuments() {
         return documentService.getAllDocuments()
                 .stream()
-                .map(DocumentMapper::toResponse)
+                .map(mapper::toResponse)
                 .toList();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<DocumentResponse> getDocumentById(@PathVariable Long id) {
         return documentService.getDocumentById(id)
-                .map(DocumentMapper::toResponse)
+                .map(mapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
     }
@@ -57,10 +55,10 @@ public class DocumentController {
             @PathVariable Long id,
             @Valid @RequestBody DocumentRequest request) {
 
-        Document updatedDocument = DocumentMapper.toEntity(request);
+        Document updatedDocument = mapper.toDomain(request);
 
         return documentService.updateDocument(id, updatedDocument)
-                .map(DocumentMapper::toResponse)
+                .map(mapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
     }

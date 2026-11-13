@@ -1,11 +1,7 @@
 
 package at.fhtw.docflow.document.application;
 
-import at.fhtw.docflow.document.api.DocumentTypeRequest;
-import at.fhtw.docflow.document.api.DocumentTypeResponse;
-import at.fhtw.docflow.document.persistence.DocumentType;
-import at.fhtw.docflow.document.api.DocumentTypeMapper;
-import at.fhtw.docflow.document.persistence.DocumentTypeRepository;
+import at.fhtw.docflow.document.domain.DocumentType;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,41 +20,29 @@ class DocumentTypeServiceTest {
     @Mock
     private DocumentTypeRepository documentTypeRepository;
 
-    @Mock
-    private DocumentTypeMapper documentTypeMapper;
-
     @InjectMocks
-    private DocumentTypeService documentTypeService;
+    private DefaultDocumentTypeService documentTypeService;
 
     @Test
     void createDocumentTypeShouldSaveDocumentType() {
 
         // Arrange
-        DocumentTypeRequest request =
-                new DocumentTypeRequest("Invoice", "Invoice document");
-
         DocumentType documentType =
-                new DocumentType("Invoice", "Invoice document");
+                DocumentType.create("Invoice", "Invoice document");
 
-        DocumentTypeResponse response =
-                new DocumentTypeResponse(1L, "Invoice", "Invoice document");
-
-        when(documentTypeMapper.toEntity(request))
-                .thenReturn(documentType);
+        DocumentType saved = new DocumentType(1L, "Invoice", "Invoice document");
 
         when(documentTypeRepository.save(documentType))
-                .thenReturn(documentType);
-
-        when(documentTypeMapper.toResponse(documentType))
-                .thenReturn(response);
+                .thenReturn(saved);
 
         // Act
-        DocumentTypeResponse result =
-                documentTypeService.create(request);
+        DocumentType result =
+                documentTypeService.create(documentType);
 
         // Assert
         assertEquals("Invoice", result.name());
         assertEquals("Invoice document", result.description());
+        assertEquals(1L, result.id());
 
         verify(documentTypeRepository).save(documentType);
     }
@@ -68,28 +52,16 @@ class DocumentTypeServiceTest {
 
         // Arrange
         DocumentType type1 =
-                new DocumentType("Invoice", "Invoice document");
+                new DocumentType(1L, "Invoice", "Invoice document");
 
         DocumentType type2 =
-                new DocumentType("Contract", "Contract document");
-
-        DocumentTypeResponse response1 =
-                new DocumentTypeResponse(1L, "Invoice", "Invoice document");
-
-        DocumentTypeResponse response2 =
-                new DocumentTypeResponse(2L, "Contract", "Contract document");
+                new DocumentType(2L, "Contract", "Contract document");
 
         when(documentTypeRepository.findAll())
                 .thenReturn(List.of(type1, type2));
 
-        when(documentTypeMapper.toResponse(type1))
-                .thenReturn(response1);
-
-        when(documentTypeMapper.toResponse(type2))
-                .thenReturn(response2);
-
         // Act
-        List<DocumentTypeResponse> result =
+        List<DocumentType> result =
                 documentTypeService.findAll();
 
         // Assert

@@ -2,7 +2,7 @@ package at.fhtw.docflow.document.api;
 
 import at.fhtw.docflow.api.ApiExceptionHandler;
 
-import at.fhtw.docflow.document.persistence.Document;
+import at.fhtw.docflow.document.domain.Document;
 import at.fhtw.docflow.document.application.DocumentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class DocumentControllerTest {
         documentService = mock(DocumentService.class);
 
         DocumentController controller =
-                new DocumentController(documentService);
+                new DocumentController(documentService, org.mapstruct.factory.Mappers.getMapper(DocumentMapper.class));
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -55,12 +55,11 @@ class DocumentControllerTest {
         verify(documentService).getDocumentById(999L);
     }
 
-
     @Test
     void getDocumentByIdShouldReturn200WhenFound() throws Exception {
 
         // Arrange
-        Document document = new Document(
+        Document document = Document.create(
                 "rechnung.pdf",
                 "application/pdf",
                 "Stromrechnung"
@@ -84,11 +83,11 @@ class DocumentControllerTest {
     void getAllDocumentsShouldReturn200() throws Exception {
 
         // Arrange
-        Document doc1 = new Document(
+        Document doc1 = Document.create(
                 "rechnung.pdf", "application/pdf", "Rechnung"
         );
 
-        Document doc2 = new Document(
+        Document doc2 = Document.create(
                 "vertrag.pdf", "application/pdf", "Vertrag"
         );
 
@@ -110,7 +109,7 @@ class DocumentControllerTest {
     void createDocumentShouldReturn201() throws Exception {
 
         // Arrange
-        Document document = new Document(
+        Document document = Document.create(
                 "rechnung.pdf", "application/pdf", "Rechnung"
         );
 
@@ -143,7 +142,7 @@ class DocumentControllerTest {
         // Arrange
         Long id = 1L;
 
-        Document updated = new Document(
+        Document updated = Document.create(
                 "neu.pdf", "application/pdf", "Neue Beschreibung"
         );
 
@@ -219,7 +218,6 @@ class DocumentControllerTest {
         verify(documentService).deleteDocument(id);
     }
 
-
     @Test
     void deleteDocumentShouldReturn404WhenNotFound() throws Exception {
 
@@ -237,7 +235,6 @@ class DocumentControllerTest {
 
         verify(documentService).deleteDocument(id);
     }
-
 
     @Test
     void createDocumentShouldReturn400WhenFilenameIsBlank() throws Exception {
@@ -263,8 +260,6 @@ class DocumentControllerTest {
                 .createDocument(any(Document.class));
     }
 
-
-
     @Test
     void addDocumentTypeShouldReturn200() throws Exception {
 
@@ -286,7 +281,6 @@ class DocumentControllerTest {
         verify(documentService)
                 .addDocumentType(documentId, typeId);
     }
-
 
     @Test
     void addDocumentTypeShouldReturnJson404WhenResourceIsMissing() throws Exception {

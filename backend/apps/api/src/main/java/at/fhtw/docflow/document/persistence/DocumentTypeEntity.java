@@ -1,18 +1,12 @@
 package at.fhtw.docflow.document.persistence;
 import jakarta.persistence.*;
 
-
 @Entity
 @Table(name = "document_types")
-public class DocumentType {
+public class DocumentTypeEntity {
 
-    public DocumentType() {
+    protected DocumentTypeEntity() {
 
-    }
-
-    public DocumentType(String name, String description) {
-        this.name = name;
-        this.description = description;
     }
 
     @Id
@@ -30,6 +24,10 @@ public class DocumentType {
 
     public String getName() {
         return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getDescription() {

@@ -285,7 +285,8 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | --- | --- |
 | Java / Spring Boot | Java 25 LTS / Boot 4.1.1 in `backend/pom.xml` |
 | Maven Wrapper | Maven 3.10.0, Wrapper 3.3.4 |
-| MapStruct / springdoc | Planned candidates: 1.6.3 / 3.1.1; not installed |
+| MapStruct | 1.6.3 library and annotation processor in `backend/apps/api/pom.xml` |
+| springdoc | Planned candidate: 3.1.1; not installed |
 | PDFBox / MinIO SDK | Planned candidates: 3.0.8 / 9.0.3; not installed |
 | OkHttp JVM | Planned candidate: 5.3.2 if required by the selected MinIO SDK; not installed |
 | JaCoCo | Planned candidate: 0.8.14 with an 80% application line-coverage gate; not configured |
@@ -388,7 +389,7 @@ GitHub Actions on PRs and pushes to `dev`/`main` should:
 5. Build images and provide a full Compose smoke-test command. Before each sprint submission, verify the complete relevant stack, including log ingestion through Logstash and visibility in Kibana. Expensive full-stack checks may run in a manual pre-release workflow; ordinary PR checks remain fast.
 6. Publish reports and verify that the submitted ZIP contains the reviewed source/configuration/fixtures and excludes secrets/caches.
 
-The current backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API Docker image from the repository root. The current suite uses mocked service/controller tests and an H2 application-context test. PostgreSQL/MinIO integration tests, the JaCoCo 80% gate, frontend checks, full-system scenarios, ZIP checks and cloud workflows remain planned; do not infer those deliverables from the backend CI file.
+The current backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API Docker image from the repository root. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round-trip tests. PostgreSQL/MinIO integration-test automation, the JaCoCo 80% gate, frontend checks, full-system scenarios, ZIP checks and cloud workflows remain planned; do not infer those deliverables from the backend CI file.
 
 ### Simple cloud deployment
 

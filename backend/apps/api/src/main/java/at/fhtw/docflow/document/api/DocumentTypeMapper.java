@@ -1,25 +1,16 @@
 package at.fhtw.docflow.document.api;
 
-import at.fhtw.docflow.document.api.DocumentTypeRequest;
-import at.fhtw.docflow.document.api.DocumentTypeResponse;
-import at.fhtw.docflow.document.persistence.DocumentType;
-import org.springframework.stereotype.Component;
+import at.fhtw.docflow.configuration.MappingConfig;
+import at.fhtw.docflow.document.domain.DocumentType;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class DocumentTypeMapper {
+@Mapper(config = MappingConfig.class)
+public interface DocumentTypeMapper {
 
-    public DocumentType toEntity(DocumentTypeRequest request) {
-        return new DocumentType(
-                request.name(),
-                request.description()
-        );
-    }
+    // Identity belongs to persistence, not the type-create representation.
+    @Mapping(target = "id", ignore = true)
+    DocumentType toDomain(DocumentTypeRequest request);
 
-    public DocumentTypeResponse toResponse(DocumentType documentType) {
-        return new DocumentTypeResponse(
-                documentType.getId(),
-                documentType.getName(),
-                documentType.getDescription()
-                );
-    }
+    DocumentTypeResponse toResponse(DocumentType documentType);
 }

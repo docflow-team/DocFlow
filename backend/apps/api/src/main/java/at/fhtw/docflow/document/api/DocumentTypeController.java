@@ -1,9 +1,5 @@
 package at.fhtw.docflow.document.api;
 
-
-import at.fhtw.docflow.document.api.DocumentTypeRequest;
-import at.fhtw.docflow.document.api.DocumentTypeResponse;
-import at.fhtw.docflow.document.persistence.DocumentType;
 import at.fhtw.docflow.document.application.DocumentTypeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,9 +12,11 @@ import java.util.List;
 public class DocumentTypeController {
 
     private final DocumentTypeService service;
+    private final DocumentTypeMapper mapper;
 
-    public DocumentTypeController(DocumentTypeService service) {
+    public DocumentTypeController(DocumentTypeService service, DocumentTypeMapper mapper) {
         this.service = service;
+        this.mapper = mapper;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -26,11 +24,11 @@ public class DocumentTypeController {
     public DocumentTypeResponse create(
             @RequestBody DocumentTypeRequest request) {
 
-        return service.create(request);
+        return mapper.toResponse(service.create(mapper.toDomain(request)));
     }
 
     @GetMapping
     public List<DocumentTypeResponse> findAll() {
-        return service.findAll();
+        return service.findAll().stream().map(mapper::toResponse).toList();
     }
 }

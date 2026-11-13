@@ -3,8 +3,7 @@ package at.fhtw.docflow.document.api;
 
 import at.fhtw.docflow.api.ApiExceptionHandler;
 
-import at.fhtw.docflow.document.api.DocumentTypeRequest;
-import at.fhtw.docflow.document.api.DocumentTypeResponse;
+import at.fhtw.docflow.document.domain.DocumentType;
 import at.fhtw.docflow.document.application.DocumentTypeService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +29,7 @@ class DocumentTypeControllerTest {
         documentTypeService = mock(DocumentTypeService.class);
 
         DocumentTypeController controller =
-                new DocumentTypeController(documentTypeService);
+                new DocumentTypeController(documentTypeService, org.mapstruct.factory.Mappers.getMapper(DocumentTypeMapper.class));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
@@ -39,17 +38,17 @@ class DocumentTypeControllerTest {
     }
 
     @Test
-    void createDocumentTypeShouldReturn200() throws Exception {
+    void createDocumentTypeShouldReturn201() throws Exception {
 
         // Arrange
-        DocumentTypeResponse response =
-                new DocumentTypeResponse(
+        DocumentType response =
+                new DocumentType(
                         1L,
                         "Invoice",
                         "Invoice document"
                 );
 
-        when(documentTypeService.create(any(DocumentTypeRequest.class)))
+        when(documentTypeService.create(any(DocumentType.class)))
                 .thenReturn(response);
 
         String json = """
@@ -70,20 +69,20 @@ class DocumentTypeControllerTest {
                 .andExpect(jsonPath("$.description").value("Invoice document"));
 
         verify(documentTypeService)
-                .create(any(DocumentTypeRequest.class));
+                .create(any(DocumentType.class));
     }
 
     @Test
     void getAllDocumentTypesShouldReturn200() throws Exception {
 
         // Arrange
-        DocumentTypeResponse type1 =
-                new DocumentTypeResponse(
+        DocumentType type1 =
+                new DocumentType(
                         1L, "Invoice", "Invoice document"
                 );
 
-        DocumentTypeResponse type2 =
-                new DocumentTypeResponse(
+        DocumentType type2 =
+                new DocumentType(
                         2L, "Contract", "Contract document"
                 );
 

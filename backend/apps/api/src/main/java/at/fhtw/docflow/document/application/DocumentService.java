@@ -1,71 +1,21 @@
 package at.fhtw.docflow.document.application;
 
-import at.fhtw.docflow.document.persistence.Document;
-import at.fhtw.docflow.document.persistence.DocumentType;
-import at.fhtw.docflow.document.persistence.DocumentRepository;
-import at.fhtw.docflow.document.persistence.DocumentTypeRepository;
-import org.springframework.stereotype.Service;
+import at.fhtw.docflow.document.domain.Document;
+
 import java.util.List;
 import java.util.Optional;
 
-@Service
-public class DocumentService {
+public interface DocumentService {
 
-    private final DocumentRepository documentRepository;
-    private final DocumentTypeRepository documentTypeRepository;
+    Document createDocument(Document document);
 
-    public DocumentService(DocumentRepository documentRepository, DocumentTypeRepository documentTypeRepository) {
-        this.documentRepository = documentRepository;
-        this.documentTypeRepository = documentTypeRepository;
-    }
+    List<Document> getAllDocuments();
 
-    public Document createDocument(Document document) {
-        return documentRepository.save(document);
-    }
+    Optional<Document> getDocumentById(Long id);
 
-    public List<Document> getAllDocuments() {
-        return documentRepository.findAll();
-    }
+    Optional<Document> updateDocument(Long id, Document changes);
 
-    public Optional<Document> getDocumentById(Long id) {
-        return documentRepository.findById(id);
-    }
+    boolean deleteDocument(Long id);
 
-    public Optional<Document> updateDocument(Long id, Document updateDocument) {
-        return documentRepository.findById(id)
-                .map(document -> {
-                    document.updateMetaDate(
-                            updateDocument.getFilename(),
-                            updateDocument.getContentType(),
-                            updateDocument.getDescription()
-                    );
-                    return documentRepository.save(document);
-                });
-    }
-
-    public boolean deleteDocument(Long id) {
-        if (!documentRepository.existsById(id)) {
-            return false;
-        }
-
-        documentRepository.deleteById(id);
-        return true;
-    }
-
-
-    public void addDocumentType(Long documentId, Long typeId) {
-
-        Document document = documentRepository
-                .findById(documentId)
-                .orElseThrow();
-
-        DocumentType documentType = documentTypeRepository
-                .findById(typeId)
-                .orElseThrow();
-
-        document.getDocumentTypes().add(documentType);
-
-        documentRepository.save(document);
-    }
+    void addDocumentType(Long documentId, Long typeId);
 }
-

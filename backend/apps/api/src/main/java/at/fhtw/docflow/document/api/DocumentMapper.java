@@ -1,28 +1,18 @@
 package at.fhtw.docflow.document.api;
 
-import at.fhtw.docflow.document.api.DocumentRequest;
-import at.fhtw.docflow.document.api.DocumentResponse;
-import at.fhtw.docflow.document.persistence.Document;
-import org.springframework.stereotype.Component;
+import at.fhtw.docflow.configuration.MappingConfig;
+import at.fhtw.docflow.document.domain.Document;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class DocumentMapper {
+@Mapper(config = MappingConfig.class)
+public interface DocumentMapper {
 
-    public static Document toEntity(DocumentRequest request) {
-        return new Document(
-                request.filename(),
-                request.contentType(),
-                request.description()
-        );
-    }
+    // Requests supply metadata only; persisted identity, time and assignments are protected.
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "documentTypeIds", ignore = true)
+    Document toDomain(DocumentRequest request);
 
-    public static DocumentResponse toResponse(Document document) {
-        return new DocumentResponse(
-                document.getId(),
-                document.getFilename(),
-                document.getContentType(),
-                document.getDescription(),
-                document.getCreatedAt()
-        );
-    }
+    DocumentResponse toResponse(Document document);
 }

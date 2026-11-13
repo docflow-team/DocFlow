@@ -1,9 +1,5 @@
 package at.fhtw.docflow.document.persistence;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import org.hibernate.annotations.CreationTimestamp;
 import jakarta.persistence.*;
 
@@ -13,7 +9,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "documents")
-public class Document {
+public class DocumentEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,14 +22,8 @@ public class Document {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
-    protected Document() {
+    protected DocumentEntity() {
 
-    }
-
-    public Document(String filename, String contentType, String description) {
-        this.filename = filename;
-        this.contentType = contentType;
-        this.description = description;
     }
 
     public Long getId() {
@@ -56,12 +46,17 @@ public class Document {
         return createdAt;
     }
 
-    public void updateMetaDate(String filename, String contentType, String description) {
+    public void setFilename(String filename) {
         this.filename = filename;
-        this.contentType = contentType;
-        this.description = description;
     }
 
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
     @ManyToMany
     @JoinTable(
@@ -69,15 +64,10 @@ public class Document {
             joinColumns = @JoinColumn(name = "document_id"),
             inverseJoinColumns = @JoinColumn(name = "document_type_id")
     )
-    private Set<DocumentType> documentTypes = new HashSet<>();
+    private Set<DocumentTypeEntity> documentTypes = new HashSet<>();
 
-    public Set<DocumentType> getDocumentTypes() {
+    public Set<DocumentTypeEntity> getDocumentTypes() {
         return documentTypes;
     }
-
-
-
-
-
 
 }

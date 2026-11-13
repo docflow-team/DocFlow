@@ -54,7 +54,7 @@ Run from `backend/`:
 ./mvnw -B -ntp clean verify
 ```
 
-The parent build includes the API module. Service/controller tests use mocks, and the application-context test uses H2; tests do not require Docker. Reports are written to `backend/apps/api/target/surefire-reports/`. On Windows, use `mvnw.cmd`.
+The parent build includes the API module. Service/controller tests mock I/O, domain/mapping tests run without Spring, and application-context/adapter round-trip tests use H2; tests do not require Docker. Reports are written to `backend/apps/api/target/surefire-reports/`. On Windows, use `mvnw.cmd`.
 
 With PostgreSQL running and the datasource environment variables set, start the API from `backend/`:
 
