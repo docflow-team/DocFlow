@@ -286,12 +286,15 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | PostgreSQL | Compose: 18.6; planned disposable tests: 18.3 Alpine (not configured) |
 | MinIO server | `RELEASE.2025-10-15T17-29-55Z`, source revision `9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a`; SHA-256 checked in `infra/minio/Dockerfile`, built with Go 1.27.4 |
 | Java images | Maven/Temurin 25 tags in `backend/Dockerfile`; not digest-pinned |
+| Frontend runtime | Node.js 24.22.3 in `frontend/.node-version`; npm lockfile committed |
+| React / Vite / TypeScript | 19.3.1 / 8.3.8 / 6.0.3 in `frontend/package.json` |
+| Frontend checks | ESLint 10.14.0, typescript-eslint 8.72.2, Prettier 3.10.1, Vitest 5.1.0, React Testing Library 16.3.3 and jsdom 31.0.1 |
 
 Verify planned dependency compatibility when each feature is introduced; candidate versions are not installed-version evidence. Real storage integration tests will build the same MinIO Dockerfile. Keep its source archive and license notices. The pinned source-build approach is an accepted team decision; do not replace it with an assumed `latest` image.
 
 The MinIO image retains the exact source archive, LICENSE, NOTICE and CREDITS in `/usr/share/doc/minio/`. Its [upstream release](https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z) identifies the source revision; the [SDK build](https://github.com/minio/minio-java/blob/9.0.3/build.gradle) specifies the matching OkHttp version. Compose runs it with a named volume, local-only ports and a readiness check. The API's `DocumentStorage` interface hides the SDK; its adapter generates object keys and creates the configured private bucket only if missing. Bootstrap excludes storage initialization. Bucket setup assumes one API instance during local startup; no initialization container, shared adapter module or cleanup framework is needed.
 
-When implementing the frontend, use Node.js 24 LTS, React 19, TypeScript and Vite with a committed npm lockfile. Check package engine/peer compatibility then, particularly TypeScript with typescript-eslint. Select worker, broker, ELK, Nginx and PWA plugin versions when introducing those components; keep Elasticsearch, Logstash and Kibana versions matched. Add no speculative retry/circuit-breaker library. Framework features and bounded retries are sufficient initially.
+The frontend uses Node.js 24 LTS, React 19, TypeScript and Vite with a committed npm lockfile. TypeScript 6.0.3 stays within [typescript-eslint's supported range](https://typescript-eslint.io/users/dependency-versions/); do not select the unsupported TypeScript 7 latest tag. Keep one TypeScript configuration and a Vite/Vitest configuration, CSS Modules and shared global styles. The typed fetch client uses relative `/api/v1` paths, explicit bearer tokens, JSON/FormData request bodies, JSON/Blob responses, safe problem errors and cancellation signals. It does not persist tokens or cache API responses. Vite proxies `/api` to the local backend without rewriting `/v1`. Add routing, query/session providers and feature folders when their screens need them. Select worker, broker, ELK, Nginx and PWA plugin versions when introducing those components; keep Elasticsearch, Logstash and Kibana versions matched. Add no speculative retry/circuit-breaker library. Framework features and bounded retries are sufficient initially.
 
 ## 6. Repository organization and containers
 
@@ -384,7 +387,7 @@ GitHub Actions on PRs and pushes to `dev`/`main` should:
 5. Build images and provide a full Compose smoke-test command. Before each sprint submission, verify the complete relevant stack, including log ingestion through Logstash and visibility in Kibana. Expensive full-stack checks may run in a manual pre-release workflow; ordinary PR checks remain fast.
 6. Publish reports and verify that the submitted ZIP contains the reviewed source/configuration/fixtures and excludes secrets/caches.
 
-The current backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API Docker image from the repository root. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round-trip tests. PostgreSQL/MinIO integration-test automation, the JaCoCo coverage gate, frontend checks, full-system scenarios, ZIP checks and cloud workflows remain planned; do not infer those deliverables from the backend CI file.
+The backend workflow runs Java 25 Wrapper `clean verify`, uploads Surefire reports and builds the API and MinIO Docker images. The suite includes mocked service/controller tests, domain and mapping tests, and H2 application-context/adapter round trips. A separate frontend workflow uses the pinned Node version and `npm ci`, then runs lint, typecheck, formatting, Vitest and the Vite production build. PostgreSQL/MinIO integration-test automation, the JaCoCo coverage gate, full-system scenarios, ZIP checks and cloud workflows remain planned.
 
 ### Simple cloud deployment
 

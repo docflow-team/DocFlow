@@ -1,0 +1,68 @@
+.workspace {
+  width: min(100% - 3rem, 72rem);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #d6dcd5;
+}
+
+.wordmark {
+  font-size: 1.7rem;
+  font-weight: 750;
+  letter-spacing: -0.06em;
+}
+.wordmark span {
+  color: #27785d;
+}
+.caption,
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.caption {
+  color: #56645e;
+}
+.intro {
+  padding-top: clamp(4rem, 13vw, 10rem);
+}
+.eyebrow {
+  margin: 0 0 1.5rem;
+  color: #31614e;
+  font-weight: 650;
+}
+.intro h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 7vw, 5.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+}
+.intro h1 span {
+  color: #32725b;
+}
+.description {
+  max-width: 28rem;
+  margin-top: 1.75rem;
+  color: #56645e;
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 480px) {
+  .workspace {
+    width: calc(100% - 2rem);
+    padding-top: 1.25rem;
+  }
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}

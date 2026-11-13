@@ -6,6 +6,7 @@ Document management coursework project for SWEN3. `backend/pom.xml` is the Maven
 
 - Docker with Docker Compose v2 or newer
 - JDK 25 for running the backend and tests outside Docker
+- Node.js 24.22.3 for frontend development (see `frontend/.node-version`)
 - Network access on the first build so Maven and Docker can download dependencies and images
 
 Copy the committed example configuration to the ignored local `.env` file:
@@ -127,6 +128,30 @@ java -jar apps/api/target/api-0.0.1-SNAPSHOT.jar
 ```
 
 For direct Java startup, provision the `api` schema using the Compose command above.
+
+## Frontend development
+
+Use the Node version in [`frontend/.node-version`](frontend/.node-version). From the repository root, these commands work on Windows, macOS and Linux:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`. Vite forwards `/api` to the backend at `http://localhost:8080`. The current UI is an app shell; login and document screens follow separately.
+
+Run frontend checks from `frontend/`:
+
+```bash
+npm run lint
+npm run typecheck
+npm run format:check
+npm test
+npm run build
+```
+
+The build goes to `frontend/dist/`. Tests use mocked API access and need no running backend.
 
 ## Current API
 
