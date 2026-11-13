@@ -387,15 +387,6 @@
   min-width: 0;
   min-height: 2.75rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid #8b9b92;
-  border-radius: 0.4rem;
-  background: #fff;
-  color: #203732;
-  font: inherit;
-}
-
-.inlineForm input[aria-invalid='true'] {
-  border-color: #9c3026;
 }
 
 .tagEditorList {

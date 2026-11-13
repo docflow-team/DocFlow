@@ -17,6 +17,7 @@ import {
   normalizeDescription,
   validateMetadata,
 } from './documentHelpers';
+import { MetadataFields } from './DocumentUploadPage';
 import { DocumentTaxonomySections } from './DocumentTaxonomySections';
 import styles from './Documents.module.css';
 
@@ -512,60 +513,17 @@ export function DocumentDetailPage() {
               )}
 
               <fieldset disabled={metadataMutation.isPending}>
-                <div className={styles.field}>
-                  <label htmlFor="title">Title</label>
-                  <input
-                    id="title"
-                    name="title"
-                    type="text"
-                    required
-                    value={activeDraft.title}
-                    aria-invalid={!!fields.title}
-                    aria-describedby={fields.title ? 'title-error' : undefined}
-                    onChange={(event) => {
-                      setValidation({});
-                      setMetadataSaved(false);
-                      if (metadataMutation.error) metadataMutation.reset();
-                      setDraft({
-                        ...activeDraft,
-                        title: event.currentTarget.value,
-                      });
-                    }}
-                  />
-                  {fields.title && (
-                    <span className={styles.fieldError} id="title-error">
-                      {fields.title}
-                    </span>
-                  )}
-                </div>
-
-                <div className={styles.field}>
-                  <label htmlFor="description">Description (optional)</label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={3}
-                    value={activeDraft.description}
-                    aria-invalid={!!fields.description}
-                    aria-describedby={
-                      fields.description ? 'description-error' : undefined
-                    }
-                    onChange={(event) => {
-                      setValidation({});
-                      setMetadataSaved(false);
-                      if (metadataMutation.error) metadataMutation.reset();
-                      setDraft({
-                        ...activeDraft,
-                        description: event.currentTarget.value,
-                      });
-                    }}
-                  />
-                  {fields.description && (
-                    <span className={styles.fieldError} id="description-error">
-                      {fields.description}
-                    </span>
-                  )}
-                </div>
+                <MetadataFields
+                  title={activeDraft.title}
+                  description={activeDraft.description}
+                  fields={fields}
+                  onChange={(field, value) => {
+                    setValidation({});
+                    setMetadataSaved(false);
+                    if (metadataMutation.error) metadataMutation.reset();
+                    setDraft({ ...activeDraft, [field]: value });
+                  }}
+                />
               </fieldset>
 
               <div className={styles.actions}>

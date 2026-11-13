@@ -21,6 +21,63 @@ interface UploadDraft {
   description: string;
 }
 
+export function MetadataFields({
+  title,
+  description,
+  fields,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  fields: Record<string, string>;
+  onChange: (field: 'title' | 'description', value: string) => void;
+}) {
+  return (
+    <>
+      <div className={styles.field}>
+        <label htmlFor="title">Title</label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          required
+          value={title}
+          aria-invalid={!!fields.title}
+          aria-describedby={fields.title ? 'title-error' : undefined}
+          onChange={(event) => onChange('title', event.currentTarget.value)}
+        />
+        {fields.title && (
+          <span className={styles.fieldError} id="title-error">
+            {fields.title}
+          </span>
+        )}
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="description">Description (optional)</label>
+        <textarea
+          id="description"
+          name="description"
+          rows={3}
+          value={description}
+          aria-invalid={!!fields.description}
+          aria-describedby={
+            fields.description ? 'description-error' : undefined
+          }
+          onChange={(event) =>
+            onChange('description', event.currentTarget.value)
+          }
+        />
+        {fields.description && (
+          <span className={styles.fieldError} id="description-error">
+            {fields.description}
+          </span>
+        )}
+      </div>
+    </>
+  );
+}
+
 export function DocumentUploadPage() {
   const session = useSession();
   const navigate = useNavigate();
@@ -152,50 +209,16 @@ export function DocumentUploadPage() {
             )}
           </div>
 
-          <div className={styles.field}>
-            <label htmlFor="title">Title</label>
-            <input
-              id="title"
-              name="title"
-              type="text"
-              required
-              value={title}
-              aria-invalid={!!fields.title}
-              aria-describedby={fields.title ? 'title-error' : undefined}
-              onChange={(event) => {
-                clearFeedback();
-                setTitle(event.currentTarget.value);
-              }}
-            />
-            {fields.title && (
-              <span className={styles.fieldError} id="title-error">
-                {fields.title}
-              </span>
-            )}
-          </div>
-
-          <div className={styles.field}>
-            <label htmlFor="description">Description (optional)</label>
-            <textarea
-              id="description"
-              name="description"
-              rows={3}
-              value={description}
-              aria-invalid={!!fields.description}
-              aria-describedby={
-                fields.description ? 'description-error' : undefined
-              }
-              onChange={(event) => {
-                clearFeedback();
-                setDescription(event.currentTarget.value);
-              }}
-            />
-            {fields.description && (
-              <span className={styles.fieldError} id="description-error">
-                {fields.description}
-              </span>
-            )}
-          </div>
+          <MetadataFields
+            title={title}
+            description={description}
+            fields={fields}
+            onChange={(field, value) => {
+              clearFeedback();
+              if (field === 'title') setTitle(value);
+              else setDescription(value);
+            }}
+          />
         </fieldset>
 
         <div className={styles.actions}>
