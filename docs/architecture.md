@@ -291,6 +291,7 @@ Prefer LTS runtimes and compatible stable dependencies. Keep Spring Boot's manag
 | React / Vite / TypeScript | 19.3.1 / 8.3.8 / 6.0.3 in `frontend/package.json` |
 | Routing / server state | React Router 8.5.1 / TanStack Query 5.107.1 |
 | Frontend checks | ESLint 10.14.0, typescript-eslint 8.72.2, Prettier 3.10.1, Vitest 5.1.0, React Testing Library 16.3.3 and jsdom 31.0.1 |
+| Web server | `nginxinc/nginx-unprivileged:1.30-alpine` (Nginx 1.30.6) in `frontend/Dockerfile` and `frontend/nginx.conf` |
 
 Verify planned dependency compatibility when each feature is introduced; candidate versions are not installed-version evidence. Real storage integration tests will build the same MinIO Dockerfile. Keep its source archive and license notices. The pinned source-build approach is an accepted team decision; do not replace it with an assumed `latest` image.
 
@@ -302,8 +303,8 @@ The frontend uses Node.js 24 LTS, React 19, TypeScript and Vite with a committed
 
 - `backend/`: Maven parent/Wrapper and `apps/api`, organized by feature with API, application/domain, persistence, integration and configuration packages.
 - Add separate `apps/ocr-worker`, `apps/indexing-worker`, `apps/genai-worker`, and `apps/batch-worker` as their sprint features arrive. Share message contracts when needed, never JPA entities or a common business model. Add focused cross-application tests with those features.
-- `frontend/`: React/PWA application. Group by feature, extracting shared API/components only for real reuse. Maven builds Java; npm builds React.
-- `infra/`: PostgreSQL namespace provisioning and the MinIO source Dockerfile; Nginx, RabbitMQ, Elasticsearch, Logstash and Kibana configuration arrive with their features.
+- `frontend/`: React/PWA application, plus its multi-stage Nginx image and co-located `nginx.conf`. Group by feature, extracting shared API/components only for real reuse. Maven builds Java; npm builds React.
+- `infra/`: PostgreSQL namespace provisioning and the MinIO source Dockerfile; RabbitMQ, Elasticsearch, Logstash and Kibana configuration arrive with their features.
 - `contracts/`: exported OpenAPI and later versioned event schemas and XML XSD. `tests/`: HTTP examples and later end-to-end fixtures/scenarios.
 - `docs/`: architecture here, delivered functionality/verification in the sprint summary, setup/usage in README. Add other documents/scripts only when they have a concrete purpose.
 

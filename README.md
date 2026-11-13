@@ -45,6 +45,7 @@ The first MinIO build downloads and compiles its pinned source inside Docker, wh
 
 With the default ports, the endpoints are:
 
+- Web UI: `http://localhost` (Nginx serving React and forwarding `/api` to `backend:8080`; override host port with `WEB_PORT`)
 - Health: `http://localhost:8080/api/health`
 - Documents: `http://localhost:8080/api/v1/documents`
 - MinIO console: `http://localhost:9001` (credentials from `.env`)
@@ -139,7 +140,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite forwards `/api` to the backend at `http://localhost:8080`. Sign in with an admin-created account; temporary passwords must be changed first. Reloading ends the session. After signing in, use the web UI to list, upload, inspect, edit metadata/categories/tags for, download and delete your PDFs; Nginx serving remains pending.
+Open `http://localhost:5173` for local Vite development (or `http://localhost` when running the full Docker Compose stack). Vite forwards `/api` to the backend at `http://localhost:8080`. Sign in with an admin-created account; temporary passwords must be changed first. Reloading ends the session. After signing in, use the web UI to list, upload, inspect, edit metadata/categories/tags for, download and delete your PDFs.
 
 Run frontend checks from `frontend/`:
 

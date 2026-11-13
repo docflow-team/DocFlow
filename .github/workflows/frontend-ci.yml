@@ -27,3 +27,6 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+      - name: Verify web Docker image build
+        working-directory: .
+        run: docker build --file frontend/Dockerfile --tag docflow-web:ci .

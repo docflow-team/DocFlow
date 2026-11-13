@@ -6,7 +6,7 @@
 
 ## Delivered functionality
 
-The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsive React app supports login, password change, protected navigation and owner-only PDF, category and tag screens; Nginx serving remains pending.
+The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsive React app served through non-root Nginx in Docker Compose supports login, password change, protected navigation and owner-only PDF, category and tag workflows on `http://localhost`.
 
 - Validated PDF upload/download, paginated listing, details, title/description editing and deletion. Upload returns `202` with inactive `NOT_STARTED` processing stages.
 - Owner-only document access, including updates, deletion and category assignment. Other owners' documents return `404`, including to administrators; metadata-only legacy rows are hidden.
@@ -20,6 +20,7 @@ The API stores PDFs in MinIO and owner-scoped metadata in PostgreSQL. A responsi
 - React login by username/email, required temporary-password change, ordinary password change and sign-out. In-memory sessions expire or end on authenticated `401`; private queries/UI are cleared and late responses ignored.
 - React document screens for paginated listing, validated multipart PDF upload (`202` stored without background queue), read-only details and `NOT_STARTED` processing status, independent metadata editing (including `null` description clearing), manual category multi-select (`PUT /documents/{id}/categories` including `Unclassified` clearing), normalized per-tag editing (`PUT /documents/{id}/tags` including empty clearing and `409` retry), authenticated PDF download with original filename, confirmed deletion and neutral `404` handling.
 - React/TypeScript/Vite foundation, CSS Modules, app error boundary and typed fetch client for JSON, multipart uploads, binary downloads, problem errors and request cancellation.
+- Multi-stage non-root Nginx web container (`frontend/Dockerfile`, `frontend/nginx.conf`) wired into Docker Compose on port `80` (configurable via `WEB_PORT`) with SPA `index.html` fallback, `/api/` proxying to `backend:8080` preserving `/api/v1`, JSON error preservation, 12 MiB multipart request limit and no response caching.
 
 The current routes and payloads are documented in [OpenAPI](../contracts/openapi.yaml); [README](../README.md#current-api) provides the quick reference. All document, category, authentication and account routes use `/api/v1`.
 
@@ -46,17 +47,19 @@ The API image build and Compose configuration passed. The tag increment passed *
 
 Clean frontend installs, lint, typecheck, formatting, **36 tests across 3 files** and production builds passed on Node 24.22.3. Chrome checks at 1280px, 375px and 320px verified responsive authentication, document, category and tag screens without horizontal overflow. Against a disposable real Compose API, verified rejected login, temporary-password routing, server field errors, password change and fresh login, token revocation, logout, reload ending the session, offline retry, invalid-PDF upload rejection preserving draft fields, `202` upload opening details with `NOT_STARTED` stages, metadata editing with null-description clearing, seeded category assignment/clearing (`Unclassified`), tag validation/server-authoritative normalization/sorting/clearing, byte-identical authenticated PDF download, cancel/confirm deletion, two-owner isolation (`admin` and `alice`, neutral `404` for another owner's document) and keyboard focus retention. Browser storage/cookies stayed empty and the console showed no unexpected errors. Component tests cover validation, pagination, empty states, multipart/metadata/category/tag payloads, failed category loads preserving assignments, draft isolation across sections, `409` tag conflict retry, detail/list query consistency, object-URL cleanup, deletion flows, cache cleanup, expiry and late responses after switching sessions; transport tests cover JSON/multipart/binary and problem errors. Viewport emulation was cleared and disposable processes/containers/volumes were removed.
 
-GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publishes Surefire reports and verifies both API and MinIO source image builds. A separate frontend workflow runs the verified npm checks. Automated PostgreSQL/MinIO integration tests and the coverage gate remain planned. Current test commands and report paths are in [README](../README.md#build-and-test).
+Docker Compose configuration validation, the multi-stage non-root `docflow-web` build (`node:24.22.3-bookworm-slim` + `nginxinc/nginx-unprivileged:1.30-alpine`) and the API and pinned MinIO builds passed without bundling `node_modules`, `.env`, secrets or private `backend:8080` hostnames into client assets. End-to-end verification through Nginx on `http://localhost` (port `80`, retaining host API port `8080`) passed deep-route SPA fallback, `404`/`401` JSON preservation on `/api/` and missing assets, `10.5 MiB` forwarding to the backend's `413` limit and `13 MiB` rejection at Nginx, temporary-password onboarding for both `admin` and `alice`, validation errors, PDF upload/edit/category/tag persistence across a full Compose restart, byte-identical authenticated download (`SHA-256` match), reload returning cleanly to `/login`, offline error and recovery, phone layout checks at `375px` and `320px`, second-owner isolation (`404`), deletion, logout, empty storage/cookies and clean console/volumes.
+
+GitHub Actions runs Java verification for PRs and pushes to `dev`/`main`, publishes Surefire reports and verifies both API and MinIO source image builds. A separate frontend workflow runs the verified npm checks and verifies the web Docker image build. Automated PostgreSQL/MinIO integration tests and the coverage gate remain planned. Current test commands and report paths are in [README](../README.md#build-and-test).
 
 ## Sprint 2 scope and remaining work
 
 Sprint 2 targets login and owner-only PDF management through React/Nginx and local Docker Compose, including tags and manual categories. Account creation is API-only. See the [agreed contracts](architecture.md#sprint-2-contract-decisions) for scope and the [task list](sprint-2-tasks.md) for each task's purpose; task progress is tracked separately in [sprint-2-progress.md](sprint-2-progress.md).
 
-Remaining work adds Nginx and focused integration/coverage checks. Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
+Remaining work adds focused PostgreSQL/MinIO integration and coverage checks. Upload returns `202 Accepted` with non-active `NOT_STARTED` stages; background processing arrives later.
 
 ## Current limitations
 
-- Nginx serving, OCR, search, messaging and AI processing remain pending.
+- OCR, search, messaging and AI processing remain pending.
 - Account listing/editing/disabling/reset and administration screens are deferred; login throttling is required before hosted access.
 - Category administration and classification approval/source metadata are deferred; current assignments are manual.
 - Existing `public`-schema records are not migrated; metadata-only rows are retained without being exposed as stored PDFs.
