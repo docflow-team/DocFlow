@@ -1,6 +1,6 @@
 # DocFlow
 
-Document management coursework project for SWEN3. `backend/pom.xml` is the Maven parent build; the Spring Boot REST application lives in `backend/apps/api/` and uses PostgreSQL persistence. The Maven Wrapper stays in `backend/`.
+Document management coursework project for SWEN3, with a React frontend and Spring Boot API.
 
 ## Prerequisites and configuration
 
@@ -9,13 +9,15 @@ Document management coursework project for SWEN3. `backend/pom.xml` is the Maven
 - Node.js 24.22.3 for frontend development (see `frontend/.node-version`)
 - Network access on the first build so Maven and Docker can download dependencies and images
 
-Copy the committed example configuration to the ignored local `.env` file:
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Replace the example `POSTGRES_PASSWORD` and set `MINIO_ROOT_PASSWORD` in `.env` to your own local passwords; MinIO requires at least 8 characters. If you already have `.env`, add the MinIO settings from `.env.example`. Keep `.env` out of Git.
+In PowerShell, use `Copy-Item .env.example .env`.
+
+Set your own `POSTGRES_PASSWORD` and `MINIO_ROOT_PASSWORD` in `.env`; MinIO requires at least 8 characters. Keep `.env` out of Git.
 
 Set `DOCFLOW_JWT_SECRET` in `.env` to a generated value:
 
@@ -41,14 +43,13 @@ docker compose up --build --detach --wait
 docker compose ps
 ```
 
-The first MinIO build downloads and compiles its pinned source inside Docker, which can take several minutes. The API creates `MINIO_BUCKET` if missing; restarting retains the bucket and stored files.
+Once the stack is healthy, open [http://localhost](http://localhost) in your browser.
+For a fresh setup, [bootstrap the first administrator](#bootstrap-the-first-administrator),
+then sign in with that username or email and password. The app prompts you to change
+the temporary password before continuing. If you set `WEB_PORT`, use
+`http://localhost:<WEB_PORT>` instead (for example, `http://localhost:3000`).
 
-With the default ports, the endpoints are:
-
-- Web UI: `http://localhost` (Nginx serving React and forwarding `/api` to `backend:8080`; override host port with `WEB_PORT`)
-- Health: `http://localhost:8080/api/health`
-- Documents: `http://localhost:8080/api/v1/documents`
-- MinIO console: `http://localhost:9001` (credentials from `.env`)
+The first MinIO source build can take several minutes.
 
 Follow the backend logs with:
 
@@ -62,9 +63,7 @@ Stop the stack while retaining its PostgreSQL and MinIO volumes:
 docker compose down
 ```
 
-PostgreSQL uses a named volume. Changing the password in `.env` does not change the password of an already initialized database volume.
-
-The API uses `ddl-auto=update` and retains data across restarts. See [schema lifecycle](docs/architecture.md#database-schema-lifecycle) for limitations and reset behavior.
+Data persists across restarts. Changing `POSTGRES_PASSWORD` in `.env` does not change an existing database password. See [schema lifecycle](docs/architecture.md#database-schema-lifecycle) for reset behavior.
 
 ## Bootstrap the first administrator
 
@@ -103,7 +102,7 @@ try {
 }
 ```
 
-Choose a password of at least 8 characters and at most 72 UTF-8 bytes. The administrator must change it at first login. Log in at `/api/v1/auth/login` and change the temporary password at `/api/v1/auth/password` before using document endpoints.
+Use a password of 8-72 characters. Sign in at [http://localhost](http://localhost); the UI requires a password change at first login.
 
 ## Build and test
 
@@ -113,35 +112,15 @@ Run the ordinary test suite and JaCoCo coverage check (>70% line minimum) from `
 ./mvnw -B -ntp clean verify
 ```
 
-The parent build includes the API module. Service/controller tests mock I/O, domain/mapping tests run without Spring, and application-context/adapter round-trip tests use H2; ordinary tests do not require Docker.
+These tests do not require Docker. On Windows, use `mvnw.cmd` instead of `./mvnw`.
 
-To also run the Docker-backed PostgreSQL 18.6 and source-built MinIO integration test (`RealStorageIntegrationIT`) with Docker running:
+With Docker running, include the PostgreSQL/MinIO integration test:
 
 ```bash
 ./mvnw -B -ntp clean verify -Pintegration-tests
 ```
 
-Optionally reuse an already-built MinIO image instead of building `infra/minio` during the test run:
-
-```bash
-./mvnw -B -ntp verify -Pintegration-tests -Ddocflow.test.minio-image=docflow-minio:ci
-```
-
-Surefire reports are written to `backend/apps/api/target/surefire-reports/`, Failsafe integration reports to `backend/apps/api/target/failsafe-reports/`, and JaCoCo HTML/CSV/XML coverage reports to `backend/apps/api/target/site/jacoco/index.html`. On Windows, use `mvnw.cmd`.
-
-With PostgreSQL and MinIO running and the datasource, MinIO and `DOCFLOW_JWT_SECRET` environment variables set, start the API from `backend/`:
-
-```bash
-./mvnw -pl apps/api spring-boot:run
-```
-
-Alternatively, after `clean verify`, run the packaged application from `backend/`:
-
-```bash
-java -jar apps/api/target/api-0.0.1-SNAPSHOT.jar
-```
-
-For direct Java startup, provision the `api` schema using the Compose command above.
+Test reports are in `backend/apps/api/target/surefire-reports/` and `failsafe-reports/`; coverage is at `backend/apps/api/target/site/jacoco/index.html`.
 
 ## Frontend development
 
@@ -153,7 +132,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173` for local Vite development (or `http://localhost` when running the full Docker Compose stack). Vite forwards `/api` to the backend at `http://localhost:8080`. Sign in with an admin-created account; temporary passwords must be changed first. Reloading ends the session. After signing in, use the web UI to list, upload, inspect, edit metadata/categories/tags for, download and delete your PDFs.
+Open [http://localhost:5173](http://localhost:5173). Keep the Compose backend running; Vite forwards `/api` to `http://localhost:8080`. Reloading ends the in-memory login session.
 
 Run frontend checks from `frontend/`:
 
@@ -169,46 +148,18 @@ The build goes to `frontend/dist/`. Tests use mocked API access and need no runn
 
 ## Current API
 
-Send `Authorization: Bearer <accessToken>` on protected requests. Tokens expire after 15 minutes; logout/password change revokes existing tokens. Documents belong to the logged-in user; another owner's records return `404`. Existing metadata-only rows without stored PDFs are hidden.
+Use the web UI to upload, list, edit metadata/categories/tags, download and delete
+your PDFs. PDFs must be unencrypted, contain 1-50 pages and be at most 10 MiB.
+Background OCR, search and AI processing are not available yet.
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| POST | `/api/v1/auth/login` | `{login, password}`; username or email |
-| GET | `/api/v1/auth/me` | Current user |
-| PUT | `/api/v1/auth/password` | `{currentPassword, newPassword}`; then log in again |
-| POST | `/api/v1/auth/logout` | Revoke tokens |
-| POST | `/api/v1/admin/users` | ADMIN creates `{username, email, role, temporaryPassword}`; `201` |
+Account creation is currently API-only: an administrator can use
+`POST /api/v1/admin/users` through the [Bruno collection](DocFlow-Requests/)
+(select **Local**, then log in) or [HTTP examples](tests/http/auth.http).
 
-| Method | Route | Success |
-| --- | --- | --- |
-| GET | `/api/health` | `200` |
-| POST | `/api/v1/documents` | `202`; multipart `file`, `title`, optional `description` |
-| GET | `/api/v1/documents?page=0&size=20` | `200`; paginated own PDFs |
-| GET | `/api/v1/documents/{id}` | `200`; metadata |
-| PUT | `/api/v1/documents/{id}/metadata` | `200`; replace `{title, description}` |
-| GET | `/api/v1/documents/{id}/content` | `200`; PDF attachment |
-| GET | `/api/v1/documents/{id}/processing` | `200`; inactive `NOT_STARTED` stages |
-| GET | `/api/v1/categories` | `200`; name-sorted shared categories |
-| PUT | `/api/v1/documents/{id}/categories` | `200`; replace `{categoryIds: [...]}` |
-| PUT | `/api/v1/documents/{id}/tags` | `200`; replace `{tags: [...]}` |
-| DELETE | `/api/v1/documents/{id}` | `204`; no body |
-
-PDFs must be parseable, unencrypted, nonempty, at most 10 MiB and contain 1-50 pages. Total multipart requests are limited to 12 MiB. Titles are trimmed and required; title/description are limited to 255 characters. Upload returns the document and processing URL; background processing is unavailable. Original files are immutable. Tags are trimmed/lowercased and deduplicated: up to 20 unique tags per document, 1-50 characters each; `[]` clears them. Responses and errors use JSON, except successful PDF downloads and empty deletions. See [OpenAPI](contracts/openapi.yaml) for the full contract.
-
-Runnable examples are in [`tests/http/auth.http`](tests/http/auth.http) and [`tests/http/documents.http`](tests/http/documents.http). The planned target architecture remains documented in [`docs/architecture.md`](docs/architecture.md).
-
-## Bruno collection
-
-Open `DocFlow-Requests/` in Bruno 3.0 or newer and select the **Local** environment.
-The collection uses [OpenCollection YAML](https://docs.usebruno.com/opencollection-yaml/overview)
-and contains one request per implemented endpoint operation (including authentication).
-Start the Docker Compose stack as described above, then send the endpoint requests as needed.
-Set `baseUrl`, `documentId` and `categoryId` in the environment for your local data.
-Run Login with your local credentials first; it captures the token as a runtime variable. After changing a temporary password, log in again. Upload and create requests capture returned IDs automatically. The upload example uses [sample.pdf](tests/fixtures/sample.pdf); select your own PDF if needed.
-Categories are seeded at startup. Choose IDs from List categories; replacing assignments accepts an empty array to clear them.
-
-Requests use the current `/api/...` controller routes; the exported `contracts/openapi.yaml`
-documents the implemented routes; the architecture also describes planned features.
+See [OpenAPI](contracts/openapi.yaml) for endpoint contracts,
+[document request examples](tests/http/documents.http) for direct API usage,
+[architecture](docs/architecture.md) for design and
+[sprint summary](docs/sprint-summary.md) for delivered features and verification.
 
 ## Project ZIP
 
